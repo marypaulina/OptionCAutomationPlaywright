@@ -153,14 +153,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         public async Task OpenSchoolAsync(string searchSchool)
         {
-            
-            await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name in the search input field
-            await IconNextGen.ClickAsync(); // Click on the NextGen icon to proceed
-           var pages = _page.Context.Pages;// Retrieve the list of all open pages (tabs/windows) in the browser context           
-            await _page.CloseAsync();// Close the current page
-            var newPage = pages.Last();// Switch to the last opened tab (which should be the newly opened school page)
-            await newPage.BringToFrontAsync(); // Ensure the new tab is active and in focus
-            await VerifyAdminDashboardAsync();// Verify that the admin dashboard is displayed
+            await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name
+
+            // Prepare to wait for the new page before clicking
+            var waitForNewPage = _page.Context.WaitForPageAsync();
+
+            // Click the NextGen icon (which opens a new tab)
+            await IconNextGen.ClickAsync();
+
+            // Wait for the new page to be created
+            var newPage = await waitForNewPage;
+
+            // Close the current page
+            await _page.CloseAsync();
+
+            // Update _page to reference the new page
+            _page = newPage;
+
+            // Bring the new page to front
+            await newPage.BringToFrontAsync();
+            await VerifyAdminDashboardAsync(); // Verify that the admin dashboard is displayed
         }
 
         // To navigate back to the Acutis domain
