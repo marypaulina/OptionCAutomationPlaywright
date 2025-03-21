@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace OptionCSMSAutomationPlayWright
+﻿namespace OptionCSMSAutomationPlayWright
 {
     public class EnumCommandAcutis
     {

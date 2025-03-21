@@ -1,21 +1,11 @@
-﻿using DocumentFormat.OpenXml.Spreadsheet;
-using IronXL;
-using System;
-using System.IO;
-using System.Drawing;
-using OfficeOpenXml;
+﻿using IronXL;
+using IronXL.Styles;
 using Microsoft.Playwright;
-using NHibernate.Mapping.ByCode;
-using OpenQA.Selenium.Support.UI;
 using OptionCSMSAutomationPlayWright.Model;
-using PuppeteerSharp;
+using Color = System.Drawing.Color;
 using IElementHandle = Microsoft.Playwright.IElementHandle;
 using IPage = Microsoft.Playwright.IPage;
 using Page = DocumentFormat.OpenXml.Spreadsheet.Page;
-using OfficeOpenXml.Style;
-using Color = System.Drawing.Color;
-using IronXL.Styles;
-using ClosedXML.Excel;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -92,7 +82,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator NavigateToParentPortal => _page.Locator("//a[@class='family-link']");
         public ILocator NavigateToStaffPortal => _page.Locator("//a[text()='Staff Portal']");
         public ILocator AdministrationMenu => _page.Locator("//a[@id='li_administration']");
-        public ILocator FeeManagementMenu => _page.Locator("//*[@id='li_billing_ledger_view']");
+        public ILocator FeeManagementMenu => _page.Locator("(//*[@id='li_billing_ledger_view'])[1]");
         public ILocator FeeDashboard => _page.Locator("//div[@class='col-md-12 topmenu_action']//a[@href='/fee-dashboard']");
         public ILocator FeeReports => _page.Locator("//div[@class='col-md-12 topmenu_action']//a[@href='/report-list']");
         public ILocator FeeReportsSearch => _page.Locator("//input[@class='form-control input-small input-inline']");
@@ -197,7 +187,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     Console.WriteLine("Admin Dashboard is NOT enabled.");
                     return false;
                 }
-                Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");              
+                Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
                 await SchoolName.WaitForAsync(); // Wait for the school name element to be present          
                 string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";// Get and trim the school name text
 
@@ -616,7 +606,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             WorkBook workBook = File.Exists(filePath) ? WorkBook.Load(filePath) : WorkBook.Create(ExcelFileFormat.XLSX);
             WorkSheet workSheet = workBook.GetWorkSheet("2024-2025") ?? workBook.CreateWorkSheet("2024-2025");
-            
+
 
 
             int lastRow = tab + 2;
@@ -633,8 +623,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             workSheet[$"E{lastRow}"].Value = dashboardAmount?.eCheckTotalAmount;
             workSheet[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0");
             workSheet[$"G{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalCharges ?? "0");
-            workSheet[$"H{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalPayment ?? "0"   );
-            workSheet[$"I{lastRow}"].Value = ConvertToDecimal(objReport?.Report904 ?? "0"   );
+            workSheet[$"H{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalPayment ?? "0");
+            workSheet[$"I{lastRow}"].Value = ConvertToDecimal(objReport?.Report904 ?? "0");
             workSheet[$"J{lastRow}"].Value = ConvertToDecimal(objReport?.Report901 ?? "0");
             workSheet[$"K{lastRow}"].Value = Math.Round(ConvertToDecimal(objReport?.Report901 ?? "0") * 1.5m / 100, 2);
             workSheet[$"L{lastRow}"].Value = ConvertToDecimal(objReport?.Report905 ?? "0");
@@ -739,21 +729,24 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await Task.Delay(2000);
 
                 // Check if the school ledger has family or user drop-down
-                bool isFamily = await Page.Locator("#familydiv").IsVisibleAsync();
-
-                if (isFamily)
-                {
-                    await DdlFamilyUser.WaitForAsync();
-                    await DdlFamilyUser.ClickAsync();
-                    await SelectAll.WaitForAsync();
-                    await SelectAll.ClickAsync();
-                }
-                else
+                
+                bool isUser = await Page.Locator("#userdiv").IsVisibleAsync();
+               
+                if (isUser)
                 {
                     await DdlUser.WaitForAsync();
                     await DdlUser.ClickAsync();
                     await SelectAllUsers.WaitForAsync();
                     await SelectAllUsers.ClickAsync();
+
+                  
+                }
+                else
+                {
+                    await DdlFamilyUser.WaitForAsync();
+                    await DdlFamilyUser.ClickAsync();
+                    await SelectAll.WaitForAsync();
+                    await SelectAll.ClickAsync();
                 }
 
                 // Click on the Ledger Filter button
@@ -977,7 +970,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task<DashboardAmount> VerifySchoolMMDashboardAsync(string startDate)
         {
             DashboardAmount dashboardAmount = new DashboardAmount();
-
+            await Task.Delay(2000);
             await _page.Locator("#tabMMDashboard").WaitForAsync();
             await _page.EvaluateAsync("window.scrollTo(0,0);");
             await _page.Locator("#tabMMDashboard").ClickAsync();
@@ -1055,7 +1048,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
     }
 
-   
+
 }
 
 

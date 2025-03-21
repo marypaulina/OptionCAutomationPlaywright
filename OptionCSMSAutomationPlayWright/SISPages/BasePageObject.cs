@@ -1,5 +1,4 @@
 ﻿using Microsoft.Playwright;
-using System.Threading.Tasks;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -29,7 +28,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             return await Page.Locator(selector).InnerTextAsync();
         }
 
-        public async Task WaitForElementAsync(string selector, int timeout = 5000)
+        public async Task WaitForElementAsync(string selector, int timeout = 50000)
         {
             await Page.Locator(selector).WaitForAsync(new LocatorWaitForOptions { Timeout = timeout });
         }

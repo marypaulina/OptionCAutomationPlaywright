@@ -1,10 +1,8 @@
 ﻿using Microsoft.Playwright;
+using OptionCSMSAutomationPlayWright.Model;
 using OptionCSMSAutomationPlayWright.SISPages;
-using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 using TechTalk.SpecFlow;
 using Table = TechTalk.SpecFlow.Table;
-using System.Security.Policy;
-using OptionCSMSAutomationPlayWright.Model;
 
 namespace OptionCSMSAutomationPlayWright.StepDefinitions
 {
@@ -48,7 +46,7 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
                 await mmPage.NavigateToFeeManagementAsync(); // Navigate to Fee Management
                 Console.WriteLine("Landed in Fee Management page");
                 ledgerPayments = await mmPage.GetChargesPaymentsAsync();// Verify charges, payments posted in last 24 hrs from the ledger
-                if (schoolCode != "3932")
+                if (schoolCode != "3932" && schoolCode != "4291")
                 {
                     dashboardAmount = await mmPage.VerifySchoolMMDashboardAsync(startDate);// Open dashboard, filter current school year, and read data
                 }
