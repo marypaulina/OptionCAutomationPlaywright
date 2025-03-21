@@ -5,3 +5,5 @@
 /.vs
 /OptionCSMSAutomationPlayWright/.vs/OptionCSMSAutomationPlayWright
 /OptionCSMSAutomationPlayWright/obj
+/OptionCSMSAutomationPlayWright/bin/Debug/net6.0/.playwright/package/bin
+/OptionCSMSAutomationPlayWright/bin/Debug/net6.0
