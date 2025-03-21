@@ -1,4 +1,7 @@
-﻿using System;
+﻿using AventStack.ExtentReports.Gherkin.Model;
+using DocumentFormat.OpenXml.EMMA;
+using Microsoft.VisualBasic;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,13 +9,11 @@ using System.Threading.Tasks;
 
 namespace OptionCSMSAutomationPlayWright.Model
 {
+    //The reason for creating these model classes(DashboardAmount and ACutisDashboardAmount) is to structure and manage financial data efficiently within automation framework.
+    //Instead of managing multiple separate variables, these classes group related financial attributes together, making the data easier to handle, access, and manipulate.
+    //Following OOP principles, these classes act as blueprints for creating objects that hold transaction data.
+    //If multiple parts of your project need to store or process financial data, you can reuse these classes instead of redefining the same properties everywhere.
     // Dashboard Amounts Model
-   /* public class DashboardAmount
-    {
-        public decimal CCTotalAmount { get; set; }
-        public decimal eCheckTotalAmount { get; set; }
-        public string TotalAmount { get; set; } = string.Empty;
-    }*/
     public class DashboardAmount
     {
         public decimal? CCTotalAmount { get; set; }

@@ -153,24 +153,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         public async Task OpenSchoolAsync(string searchSchool)
         {
-            // Enter the school name in the search input field
-            await TxtAcuSchoolSearch.FillAsync(searchSchool);
-
-            // Click on the NextGen icon to proceed
-            await IconNextGen.ClickAsync();
-
-            // Retrieve the list of all open pages (tabs/windows) in the browser context
-            var pages = _page.Context.Pages;
-
-            // Close the current page
-            await _page.CloseAsync();
-
-            // Switch to the last opened tab (which should be the newly opened school page)
-            var newPage = pages.Last();
+            
+            await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name in the search input field
+            await IconNextGen.ClickAsync(); // Click on the NextGen icon to proceed
+           var pages = _page.Context.Pages;// Retrieve the list of all open pages (tabs/windows) in the browser context           
+            await _page.CloseAsync();// Close the current page
+            var newPage = pages.Last();// Switch to the last opened tab (which should be the newly opened school page)
             await newPage.BringToFrontAsync(); // Ensure the new tab is active and in focus
-
-            // Verify that the admin dashboard is displayed
-            await VerifyAdminDashboardAsync();
+            await VerifyAdminDashboardAsync();// Verify that the admin dashboard is displayed
         }
 
         // To navigate back to the Acutis domain
@@ -187,7 +177,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // Wait for the admin dashboard section to be visible
                 var dashboardLocator = _page.Locator("//*[@id='sec-slider']/div");
                 await dashboardLocator.WaitForAsync();
-
                 // Check if the admin dashboard element is enabled
                 bool isDashboardEnabled = await AdminDashboard.IsEnabledAsync();
 
@@ -196,24 +185,16 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     Console.WriteLine("Admin Dashboard is NOT enabled.");
                     return false;
                 }
-
-                Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
-
-                // Wait for the school name element to be present
-                await SchoolName.WaitForAsync();
-
-                // Get and trim the school name text
-                string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";
+                Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");              
+                await SchoolName.WaitForAsync(); // Wait for the school name element to be present          
+                string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";// Get and trim the school name text
 
                 // Ensure the log file directory exists
                 if (!Directory.Exists(directoryPath))
                 {
                     Directory.CreateDirectory(directoryPath);
                 }
-
-                // Append the school name to the audit log file
-                await File.AppendAllTextAsync(path, $"School Name: {getSchoolName}\n");
-
+                await File.AppendAllTextAsync(path, $"School Name: {getSchoolName}\n");// Append the school name to the audit log file
                 return true;
             }
             catch (Exception ex)
