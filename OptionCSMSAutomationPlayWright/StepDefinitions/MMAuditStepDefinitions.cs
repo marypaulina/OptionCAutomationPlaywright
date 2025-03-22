@@ -2,6 +2,7 @@
 using OptionCSMSAutomationPlayWright.Model;
 using OptionCSMSAutomationPlayWright.SISPages;
 using TechTalk.SpecFlow;
+using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 using Table = TechTalk.SpecFlow.Table;
 
 namespace OptionCSMSAutomationPlayWright.StepDefinitions
@@ -12,11 +13,11 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
         private readonly IPage page; // Using Playwright's IPage instead of IWebDriver
         private readonly MMAuditPages mmPage;
         //private readonly WaitHelper objWaitHelper;
-        public MMAuditStepDefinitions(IPage page) // Constructor
+        public MMAuditStepDefinitions(IPage page, WaitHelper objWaitHelper) // Constructor
         {
             this.page = page;
             //this.objWaitHelper = objWaitHelper;
-            this.mmPage = new MMAuditPages(page);
+            this.mmPage = new MMAuditPages(page, objWaitHelper);
 
         }
 

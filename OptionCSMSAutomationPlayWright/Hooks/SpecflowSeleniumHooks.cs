@@ -17,29 +17,17 @@ namespace OptionCSMSAutomationPlayWright.Hooks
         private static string reportPath = System.IO.Directory.GetParent(@"../../../").FullName + Path.DirectorySeparatorChar + "Result" + Path.DirectorySeparatorChar + "Result_" + DateTime.Now.ToString("ddMMyyyyHHmmss");
 
         private readonly IObjectContainer container;
-        /*private IPlaywright _playwright;
-        private IBrowser _browser;
-        private IPage _page;*/
-
         private IPlaywright _playwright;
         private IBrowser _browser;
-        private IBrowserContext _context;  // Added
         private IPage _page;
 
         private const string ScreenshotsDirectory = "Screenshots";
         private const string ScreenshotFileExtension = ".png";
         private const string ChromeExecutablePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
-        private readonly ScenarioContext _scenarioContext;
 
-        //public SpecflowSeleniumHooks(IObjectContainer container, ScenarioContext scenarioContext)
-        //{
-        //    this.container = container;
-        //    _scenarioContext = scenarioContext;
-        //}
         public SpecflowSeleniumHooks(IObjectContainer container)
         {
             this.container = container;
-            //_scenarioContext = scenarioContext;
         }
 
         [BeforeTestRun]
@@ -63,24 +51,33 @@ namespace OptionCSMSAutomationPlayWright.Hooks
             Console.WriteLine("BeforeScenario");
             scenario = featureName.CreateNode<Scenario>(scenarioContext.ScenarioInfo.Title);
 
-            if (_playwright == null)  // Ensure only one instance is created
-                _playwright = await Playwright.CreateAsync();
+            // Initialize Playwright
+            _playwright = await Playwright.CreateAsync();
 
-            if (_browser == null)
+            // Launch the browser
+            _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
             {
-                _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-                {
-                    Headless = false,
-                    ExecutablePath = ChromeExecutablePath
-                });
-            }
+                Headless = false, // Set to true for headless mode if needed
+                ExecutablePath = ChromeExecutablePath
+            });
 
-            _context = await _browser.NewContextAsync();
-            _page = await _context.NewPageAsync();
+            // Create a new context
+            var context = await _browser.NewContextAsync();
 
-            await _page.SetViewportSizeAsync(1500, 700);
+            // Create a new page within the context
+            _page = await context.NewPageAsync();
+
+            // Set a large viewport size
+            await _page.SetViewportSizeAsync(1500, 700); // Set according to your screen size
+
+            // Optionally, you can reposition the browser window using the DevTools Protocol
+            // Note: This doesn't directly maximize the window but allows for custom sizing
+            await _page.EvaluateAsync(@"window.resizeTo(screen.width, screen.height);");
+
+            // Bring the page to the front for visibility
             await _page.BringToFrontAsync();
 
+            // Register the page instance
             container.RegisterInstanceAs<IPage>(_page);
         }
 
@@ -157,35 +154,33 @@ namespace OptionCSMSAutomationPlayWright.Hooks
                 {
                     Console.WriteLine($"Failed to close page: {e.Message}");
                 }
-                _page = null;
+                _page = null; // Avoid repeated disposal
             }
 
             if (_browser != null)
             {
                 try
                 {
-                    // Commenting this out for debugging
-                    // await _browser.CloseAsync();
+                    await _browser.CloseAsync();
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine($"Failed to close browser: {e.Message}");
                 }
-                _browser = null;
+                _browser = null; // Avoid repeated disposal
             }
 
             if (_playwright != null)
             {
                 try
                 {
-                    // Commenting this out for debugging
-                    // _playwright.Dispose();
+                    _playwright.Dispose();
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine($"Failed to dispose Playwright: {e.Message}");
                 }
-                _playwright = null;
+                _playwright = null; // Avoid repeated disposal
             }
         }
 

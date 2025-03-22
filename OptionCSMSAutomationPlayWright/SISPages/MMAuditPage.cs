@@ -1,26 +1,34 @@
 ﻿using IronXL;
 using IronXL.Styles;
 using Microsoft.Playwright;
+using NUnit.Framework;
 using OptionCSMSAutomationPlayWright.Model;
 using Color = System.Drawing.Color;
 using IElementHandle = Microsoft.Playwright.IElementHandle;
 using IPage = Microsoft.Playwright.IPage;
 using Page = DocumentFormat.OpenXml.Spreadsheet.Page;
+using Path = System.IO.Path;
+using System.Drawing.Imaging;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
     public class MMAuditPages : BasePageObject
     {
         private IPage _page;
-
+        private WaitHelper waitHelper;
         private readonly string directoryPath = "D:\\File";
         public string path = string.Empty;
 
 
 
-        public MMAuditPages(IPage page) : base(page)
+        public MMAuditPages(IPage page, WaitHelper waitHelper) : base(page)
         {
             _page = page;
+            this.waitHelper = waitHelper;
             path = Path.Combine(directoryPath, "Audit Summary.txt");
 
         }
@@ -143,33 +151,35 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         public async Task OpenSchoolAsync(string searchSchool)
         {
-            await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name
+            await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name    
 
-            // Prepare to wait for the new page before clicking
-            var waitForNewPage = _page.Context.WaitForPageAsync();
+            var waitForNewPage = _page.Context.WaitForPageAsync(); // Prepare to wait for the new page before clicking
 
-            // Click the NextGen icon (which opens a new tab)
-            await IconNextGen.ClickAsync();
+            await IconNextGen.ClickAsync(); // Click the NextGen icon (which opens a new tab)
 
-            // Wait for the new page to be created
-            var newPage = await waitForNewPage;
+            var newPage = await waitForNewPage; // Wait for the new page to be created
 
-            // Close the current page
-            await _page.CloseAsync();
+            if (newPage == null)
+            {
+                throw new Exception("Failed to open the new page.");
+            }
 
-            // Update _page to reference the new page
-            _page = newPage;
+            if (!_page.IsClosed)
+            {
+                await _page.CloseAsync(); // Close the current page only if it's still open
+            }
 
-            // Bring the new page to front
-            await newPage.BringToFrontAsync();
+            _page = newPage; // Update _page to reference the new page
+            await _page.BringToFrontAsync(); // Bring the new page to the front
+
             await VerifyAdminDashboardAsync(); // Verify that the admin dashboard is displayed
         }
 
+
         // To navigate back to the Acutis domain
         public async Task BackToAcutisAsync()
-        {
-            // Navigate to the Acutis school details page
-            await _page.GotoAsync("https://acutis.optionc.com/school-details");
+        {           
+            await _page.GotoAsync("https://acutis.optionc.com/school-details");// Navigate to the Acutis school details page
         }
 
         public async Task<bool> VerifyAdminDashboardAsync()
@@ -226,9 +236,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             {
                 throw new Exception("Fee Reports page is not enabled.");
             }
-
             Console.WriteLine("Fee Reports page is opened");
-
             // Click on the Fee Reports page
             await FeeReports.ClickAsync();
         }
@@ -276,7 +284,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 // Scroll to the bottom of the page
-                await Page.EvaluateAsync("window.scrollBy(0, document.body.scrollHeight)");
+                await _page.EvaluateAsync("window.scrollBy(0, document.body.scrollHeight)");
 
                 // Wait for the Funding Amount label and get its text
                 await LblFundingAmount.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
@@ -311,7 +319,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             var reportData = new ReportData();
             string getTransactionAmt = "0.00";
 
-            var pages = Page.Context.Pages; // Get all open pages
+            var pages = _page.Context.Pages; // ✅ Correct
+ // Get all open pages
 
             // Close the current page
             await _page.CloseAsync();
@@ -343,14 +352,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             IReadOnlyList<IElementHandle> tableRows;
             if (ReportId != 911)
             {
-                await Page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
-                tableRows = await Page.QuerySelectorAllAsync("//tfoot");
+                await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
+                tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
             else
             {
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-                await Page.WaitForTimeoutAsync(10000);  // Artificial delay (consider replacing with event-based waiting)
-                tableRows = await Page.QuerySelectorAllAsync("//tfoot");
+                await _page.WaitForTimeoutAsync(10000);  // Artificial delay (consider replacing with event-based waiting)
+                tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
 
             string totalValue = "0.00";
@@ -358,11 +367,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             {
                 await RecordLength.SelectOptionAsync("-1");
 
-                var rows = await Page.QuerySelectorAllAsync("//table//tbody/tr");
+                var rows = await _page.QuerySelectorAllAsync("//table//tbody/tr");
                 decimal amount = 0;
                 decimal serviceFeeAmount = 0;
 
-                var rowsCount = await Page.QuerySelectorAllAsync("//td[text()='New']|//td[text()='Processing']");
+                var rowsCount = await _page.QuerySelectorAllAsync("//td[text()='New']|//td[text()='Processing']");
                 if (rowsCount.Count > 0)
                 {
                     foreach (var row in rows)
@@ -420,9 +429,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                     foreach (var reportId in reportIds)
                     {
-                        await Page.GotoAsync("https://feemanagement.optionc.com/report-list");
+                        await _page.GotoAsync("https://feemanagement.optionc.com/report-list");
 
-                        await SearchFeeReportAsync(reportId, Page);
+                        await SearchFeeReportAsync(reportId, _page);
                         ReportData reportData = await StartFilterAsync(reportId, objReport);
 
                         switch (reportId)
@@ -697,103 +706,99 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             LedgerPayments ledgerPayments = new LedgerPayments();
 
-            try
+
+            // Wait for the alumni disabled user checkbox and click it
+            await ChkAlumniDisableduser.WaitForAsync();
+            await ChkAlumniDisableduser.ClickAsync();
+
+            await Task.Delay(5000); // Explicit wait
+
+            string note = "Testing";
+
+            // Enter and clear note text
+            await TxtNote.WaitForAsync();
+            await TxtNote.FillAsync(note);
+            await TxtNote.ClearAsync();
+
+            // Enter and clear reference text
+            await TxtReference.WaitForAsync();
+            await TxtReference.FillAsync(note);
+            await TxtReference.ClearAsync();
+
+            // Get Yesterday's Date
+            DateTime yesterday = DateTime.Now.AddDays(-1);
+            string startDate = yesterday.ToString("MM/dd/yyyy");
+
+            // Enter start date
+            await TxtStartDate.WaitForAsync();
+            await TxtStartDate.ClearAsync();
+            await Task.Delay(1000);
+            await TxtStartDate.FillAsync(startDate);
+            await Task.Delay(2000);
+
+            // Check if the school ledger has family or user drop-down
+
+            bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
+
+            if (isUser)
             {
-                // Wait for the alumni disabled user checkbox and click it
-                await ChkAlumniDisableduser.WaitForAsync();
-                await ChkAlumniDisableduser.ClickAsync();
+                await DdlUser.WaitForAsync();
+                await DdlUser.ClickAsync();
+                await SelectAllUsers.WaitForAsync();
+                await SelectAllUsers.ClickAsync();
 
-                await Task.Delay(5000); // Explicit wait
 
-                string note = "Testing";
-
-                // Enter and clear note text
-                await TxtNote.WaitForAsync();
-                await TxtNote.FillAsync(note);
-                await TxtNote.ClearAsync();
-
-                // Enter and clear reference text
-                await TxtReference.WaitForAsync();
-                await TxtReference.FillAsync(note);
-                await TxtReference.ClearAsync();
-
-                // Get Yesterday's Date
-                DateTime yesterday = DateTime.Now.AddDays(-1);
-                string startDate = yesterday.ToString("MM/dd/yyyy");
-
-                // Enter start date
-                await TxtStartDate.WaitForAsync();
-                await TxtStartDate.ClearAsync();
-                await Task.Delay(1000);
-                await TxtStartDate.FillAsync(startDate);
-                await Task.Delay(2000);
-
-                // Check if the school ledger has family or user drop-down
-                
-                bool isUser = await Page.Locator("#userdiv").IsVisibleAsync();
-               
-                if (isUser)
-                {
-                    await DdlUser.WaitForAsync();
-                    await DdlUser.ClickAsync();
-                    await SelectAllUsers.WaitForAsync();
-                    await SelectAllUsers.ClickAsync();
-
-                  
-                }
-                else
-                {
-                    await DdlFamilyUser.WaitForAsync();
-                    await DdlFamilyUser.ClickAsync();
-                    await SelectAll.WaitForAsync();
-                    await SelectAll.ClickAsync();
-                }
-
-                // Click on the Ledger Filter button
-                await BtnLedgerFilter.WaitForAsync();
-                await BtnLedgerFilter.ClickAsync();
-
-                await Task.Delay(4000); // Wait for the table to load
-
-                // Wait for the ledger table to be present
-                var ledgerTable = await Page.Locator("#tblLedger").IsVisibleAsync();
-                if (!ledgerTable)
-                {
-                    Console.WriteLine("Ledger table not found.");
-                    return ledgerPayments;
-                }
-
-                var rows = await Page.Locator("#tblLedger tr").CountAsync();
-                string getDebit = "0";
-
-                if (rows > 2)
-                {
-                    // Get the total charges and payments
-                    string getCredit = await LblTotalCredit.InnerTextAsync() ?? "0";
-                    getDebit = await LblTotalDebit.InnerTextAsync() ?? "0";
-
-                    getCredit = getCredit.Trim();
-                    getDebit = getDebit.Trim();
-
-                    // Log School Ledger Statistics
-                    await File.AppendAllTextAsync(path,
-                        "SCHOOL LEDGER STATISTICS\n=======================\n" +
-                        $"Total Charges Posted in Ledger (Last 24 hrs): {getDebit}\n" +
-                        $"Total Credit in Ledger (Last 24 hrs): {getCredit}\n");
-                }
-                else
-                {
-                    await File.AppendAllTextAsync(path,
-                        "SCHOOL LEDGER STATISTICS\n=======================\n" +
-                        $"School Ledger: No Charges or Payments posted for today ({startDate})\n");
-                }
-
-                ledgerPayments = await TodaysMMPaymentsAsync(getDebit);
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine($"An error occurred while retrieving School Ledger Payments: {ex.Message}");
+                await DdlFamilyUser.WaitForAsync();
+                await DdlFamilyUser.ClickAsync();
+                await SelectAll.WaitForAsync();
+                await SelectAll.ClickAsync();
             }
+
+            // Click on the Ledger Filter button
+            await BtnLedgerFilter.WaitForAsync();
+            await BtnLedgerFilter.ClickAsync();
+
+            await Task.Delay(4000); // Wait for the table to load
+
+            // Wait for the ledger table to be present
+            var ledgerTable = await _page.Locator("#tblLedger").IsVisibleAsync();
+            if (!ledgerTable)
+            {
+                Console.WriteLine("Ledger table not found.");
+                return ledgerPayments;
+            }
+
+            var rows = await _page.Locator("#tblLedger tr").CountAsync();
+            string getDebit = "0";
+
+            if (rows > 2)
+            {
+                // Get the total charges and payments
+                string getCredit = await LblTotalCredit.InnerTextAsync() ?? "0";
+                getDebit = await LblTotalDebit.InnerTextAsync() ?? "0";
+
+                getCredit = getCredit.Trim();
+                getDebit = getDebit.Trim();
+
+                // Log School Ledger Statistics
+                await File.AppendAllTextAsync(path,
+                    "SCHOOL LEDGER STATISTICS\n=======================\n" +
+                    $"Total Charges Posted in Ledger (Last 24 hrs): {getDebit}\n" +
+                    $"Total Credit in Ledger (Last 24 hrs): {getCredit}\n");
+            }
+            else
+            {
+                await File.AppendAllTextAsync(path,
+                    "SCHOOL LEDGER STATISTICS\n=======================\n" +
+                    $"School Ledger: No Charges or Payments posted for today ({startDate})\n");
+            }
+
+            ledgerPayments = await TodaysMMPaymentsAsync(getDebit);
+        
+            
 
             return ledgerPayments;
         }
