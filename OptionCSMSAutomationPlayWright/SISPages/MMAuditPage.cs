@@ -13,6 +13,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
+using OpenQA.Selenium;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -319,15 +320,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             var reportData = new ReportData();
             string getTransactionAmt = "0.00";
 
-            var pages = _page.Context.Pages; // ✅ Correct
- // Get all open pages
+            // Get all open pages
+            var allPages = _page.Context.Pages;
 
-            // Close the current page
-            await _page.CloseAsync();
+            // Close the current page if it's still open
+            if (!_page.IsClosed)
+            {
+                await _page.CloseAsync();
+            }
 
-            // Switch to the last opened page
-            var lastPage = pages.Last();
-            await lastPage.BringToFrontAsync();
+            // Get the last opened page
+            var lastPage = allPages.LastOrDefault();
+
+            if (lastPage == null)
+            {
+                throw new Exception("Failed to switch to the last opened page.");
+            }
+
+            // Update _page to reference the last page
+            _page = lastPage;
+            await _page.BringToFrontAsync(); // Bring the last page to the front
 
             if (ReportId != 911)
             {
@@ -400,9 +412,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             else
             {
-                totalValue = tableRows.Count > 0
+                totalValue = tableRows.Count > 0 ? (ReportId != 911 ? await ReportValue.First.InnerTextAsync() : await Report911Value.First.InnerTextAsync()) : "0.00";
+
+
+
+                /*totalValue = tableRows.Count > 0
                     ? (ReportId != 911 ? await ReportValue.InnerTextAsync() : await Report911Value.InnerTextAsync())
-                    : "0.00";
+                    : "0.00";*/
 
                 if (ReportId == 902 || ReportId == 905)
                 {
@@ -730,11 +746,16 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             string startDate = yesterday.ToString("MM/dd/yyyy");
 
             // Enter start date
+            //await DateFunction(TxtStartDate.ToString()).WaitForAsync();
+            //await TxtStartDate.FillAsync(DateFunction(await TxtStartDate.InputValueAsync()));
             await TxtStartDate.WaitForAsync();
-            await TxtStartDate.ClearAsync();
+            //await TxtStartDate.ClearAsync();
             await Task.Delay(1000);
             await TxtStartDate.FillAsync(startDate);
+            await TxtStartDate.ClickAsync();
+            await TxtStartDate.FillAsync(startDate);
             await Task.Delay(2000);
+           // await TxtStartDate.PressAsync("Tab");
 
             // Check if the school ledger has family or user drop-down
 
@@ -898,7 +919,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         // Method to get today's MM Payments
         public async Task<LedgerPayments> TodaysMMPaymentsAsync(string getDebit)
         {
-            var ledgerPayments = new LedgerPayments();
+            var ledgerPayments = new LedgerPayments();//Object Creation for Ledger Payment class
             ledgerPayments.TotalCharges = string.IsNullOrEmpty(getDebit) ? "0" : getDebit;
 
             var table = await _page.QuerySelectorAsync("#tblLedger"); // Find the ledger table
@@ -913,18 +934,42 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             if (rowCount > 2)
             {
-                await SelectPaymentMethodAsync("#ddlPaymentMethod", "#selectCreditCard", "#btnLedgerFilter");
-                ccAmount = await GetLedgerAmountAsync("#tblLedger_wrapper div table tfoot tr td", "#lblTotalCredit");
+                await DdlPaymentMethod.WaitForAsync();
+                await DdlPaymentMethod.ClickAsync();
+                await SelectCreditCard.WaitForAsync();
+                await SelectCreditCard.ClickAsync();
+                await BtnLedgerFilter.WaitForAsync();
+                await BtnLedgerFilter.ClickAsync();
+                await Task.Delay(3000);
 
-                await SelectPaymentMethodAsync("#ddlPaymentMethod", "#selecteCheck", "#btnLedgerFilter");
-                eCheckAmount = await GetLedgerAmountAsync("#tblLedger_wrapper div table tfoot tr td", "#lblTotalCredit");
+                bool isLedgerRowsExistCheck = (await _page.QuerySelectorAsync("//*[@id='tblLedger_wrapper']/div[2]/div/div[3]/div/table/tfoot/tr[1]/td[1]")) != null;
+                if (isLedgerRowsExistCheck)
+                {
+                    bool isElementPresent = (await _page.Locator("//*[@id='tblLedger_wrapper']/div[2]/div/div[3]/div/table/tfoot/tr[1]/td[1]").CountAsync()) > 0;
+                    // Get the total payments text
+                    string getCredit2 = (await LblTotalCredit.InnerTextAsync())?.Trim();
+                    getCredit2 = string.IsNullOrEmpty(getCredit2) ? "0" : getCredit2;
+                    // Assign to eCheckAmount
+                    eCheckAmount = string.IsNullOrEmpty(getCredit2) ? "0" : getCredit2;
+                    // Convert and calculate total payment
+                    totalMMPayment =
+                        (string.IsNullOrEmpty(ccAmount) ? 0 : Convert.ToDecimal(ccAmount.Replace("$", ""))) +
+                        (string.IsNullOrEmpty(eCheckAmount) ? 0 : Convert.ToDecimal(eCheckAmount.Replace("$", "")));
 
-                totalMMPayment = (string.IsNullOrEmpty(ccAmount) ? 0 : Convert.ToDecimal(ccAmount.Replace("$", ""))) +
-                                 (string.IsNullOrEmpty(eCheckAmount) ? 0 : Convert.ToDecimal(eCheckAmount.Replace("$", "")));
+                }
+                else
+                {
+                    eCheckAmount = "0.00";
+                    totalMMPayment =
+                        (string.IsNullOrEmpty(ccAmount) ? 0 : Convert.ToDecimal(ccAmount.Replace("$", ""))) +
+                        (string.IsNullOrEmpty(eCheckAmount) ? 0 : Convert.ToDecimal(eCheckAmount.Replace("$", "")));
+                }
+               
             }
-
-            await LogPaymentsAsync(ccAmount, eCheckAmount, totalMMPayment);
-
+            using (StreamWriter writer = new StreamWriter(path, true))
+            {
+                writer.WriteLine("Total Credit Card Payments(Last 24 hrs): " + ccAmount + "\r\n" + "Total eCheck Payments(Last 24 hrs): " + eCheckAmount + "\r\n" + "Total MM Payment(Last 24 hrs) : " + totalMMPayment + "\r\n");
+            }
             ledgerPayments.CCPayment = ccAmount;
             ledgerPayments.eCheckPayment = eCheckAmount;
             ledgerPayments.TotalPayment = totalMMPayment.ToString();
@@ -976,23 +1021,27 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             DashboardAmount dashboardAmount = new DashboardAmount();
             await Task.Delay(2000);
-            await _page.Locator("#tabMMDashboard").WaitForAsync();
+            //await _page.Locator("#tabMMDashboard").WaitForAsync();
+            await TabMMDashboard.WaitForAsync();
             await _page.EvaluateAsync("window.scrollTo(0,0);");
-            await _page.Locator("#tabMMDashboard").ClickAsync();
-            await _page.Locator("#tabCustom").WaitForAsync();
-            await _page.Locator("#tabCustom").ClickAsync();
+            //await _page.Locator("#tabMMDashboard").ClickAsync();
+            await TabMMDashboard.ClickAsync();
+            await TabCustom.WaitForAsync();
+            await TabCustom.ClickAsync();
+           
 
             DateTime today = DateTime.Now;
             string endDate = today.ToString("MM/dd/yyyy");
 
-            await _page.Locator("#txtStartDate").WaitForAsync();
-            await _page.Locator("#txtStartDate").FillAsync(DateFunction(startDate));
-
-            await _page.Locator("#txtEndDate").WaitForAsync();
-            await _page.Locator("#txtEndDate").FillAsync(DateFunction(endDate));
-
-            await _page.Locator("#btnCustomFilter").WaitForAsync();
-            await _page.Locator("#btnCustomFilter").ClickAsync();
+           
+            await TxtStartDate.WaitForAsync();
+            await TxtStartDate.FillAsync(DateFunction(startDate));
+            await TxtStartDate.PressAsync("Tab");
+            await TxtEndDate.WaitForAsync();
+            await TxtEndDate.FillAsync(DateFunction(endDate));
+            await TxtEndDate.PressAsync("Tab");
+            await BtnCustomFilter.WaitForAsync();
+            await BtnCustomFilter.ClickAsync();
 
             await _page.WaitForTimeoutAsync(1000); // Instead of Thread.Sleep
 
@@ -1004,10 +1053,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             try
             {
-                var lblCCAmount = await _page.Locator("#lblCCAmount").InnerTextAsync();
-                var lblCCCount = await _page.Locator("#lblCCCount").InnerTextAsync();
-                var lbleCheckAmount = await _page.Locator("#lbleCheckAmount").InnerTextAsync();
-                var lbleCheckCount = await _page.Locator("#lbleCheckCount").InnerTextAsync();
+                var lblCCAmount = await LblCCAmount.InnerTextAsync();           
+                var lblCCCount = await LblCCCount.InnerTextAsync();
+                var lbleCheckAmount = await LbleCheckAmount.InnerTextAsync();
+                var lbleCheckCount = await LbleCheckCount.InnerTextAsync();
 
                 string getCCAmt = string.IsNullOrEmpty(lblCCAmount) ? "0" : lblCCAmount.Replace("$", "");
                 CCTotAmt = string.IsNullOrEmpty(getCCAmt) ? "0" : getCCAmt;
