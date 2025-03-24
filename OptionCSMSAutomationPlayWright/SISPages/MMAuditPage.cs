@@ -240,6 +240,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             Console.WriteLine("Fee Reports page is opened");
             // Click on the Fee Reports page
             await FeeReports.ClickAsync();
+            await Task.Delay(1000);
         }
 
         // This method verifies whether the Fee Management dashboard is displayed
@@ -335,6 +336,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             if (lastPage == null)
             {
                 throw new Exception("Failed to switch to the last opened page.");
+                
             }
 
             // Update _page to reference the last page
@@ -494,33 +496,55 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
         public async Task<Report> VerifyAccountStatusAsync(Report objreport, IPage Page)
         {
-            await Page.GotoAsync("https://feemanagement.optionc.com/report-list");
-
+            
+            await _page.GotoAsync("https://feemanagement.optionc.com/report-list");
             await SearchFeeReportAsync(907, Page);
 
             var pages = Page.Context.Pages;
+
+            // Ensure multiple pages exist before handling switching
             if (pages.Count > 1)
             {
-                await pages[0].CloseAsync();
-                Page = pages.Last();
+                var firstPage = pages.FirstOrDefault();
+
+                if (firstPage != null && !firstPage.IsClosed)
+                {
+                    await firstPage.CloseAsync();
+                }
+                else
+                {
+                    Console.WriteLine("First page is already closed. Proceeding to the last opened page.");
+                }
+
+                // Switch to the last opened page safely
+                Page = Page.Context.Pages.LastOrDefault() ?? throw new Exception("Failed to switch to the last opened page.");
+            }
+            else
+            {
+                Console.WriteLine("Only one page is open. No need to switch pages.");
             }
 
-            await Page.WaitForSelectorAsync("#staffCheck");
-            var staffCheck = Page.Locator("#staffCheck");
-            var btnRunReport = Page.Locator("#btnRunReport");
 
+            await Page.WaitForSelectorAsync("#chkStaff");
+            var staffCheck = _page.Locator("#chkStaff");
             if (await staffCheck.IsVisibleAsync())
             {
                 await staffCheck.ClickAsync();
+                await Task.Delay(3000);
             }
 
-            if (await btnRunReport.IsEnabledAsync())
+            //await Page.WaitForSelectorAsync("#");
+            var btnReport = _page.Locator("//input[@value='Run Report']");
+            if(await btnReport.IsVisibleAsync())
             {
-                await btnRunReport.ClickAsync();
-            }
+                await BtnRunReport.ClickAsync();
 
-            var recordLength = Page.Locator("#Recordlength");
-            await recordLength.SelectOptionAsync("-1");
+            }
+            
+            
+
+            //var recordLength = Page.Locator("#Recordlength");
+            await RecordLength.SelectOptionAsync("-1");
 
             var primaryRows = await Page.Locator("//table//tbody//tr").CountAsync();
             var rowsCount = await Page.Locator("//*[@id='tblParentAccountSetup']/tbody/tr/td[@class='dataTables_empty']").CountAsync();
@@ -533,7 +557,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await writer.WriteLineAsync($"\r\nACCOUNT SETUP STATISTICS\r\n========================\r\nTotal Primary Accounts: {totalPrimaryAccounts}");
             }
 
-            await recordLength.SelectOptionAsync("-1");
+            await RecordLength.SelectOptionAsync("-1");
 
             var accountCreatedRadio = Page.Locator("#AccountCreatedradio");
             if (await accountCreatedRadio.IsVisibleAsync())
@@ -541,9 +565,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await accountCreatedRadio.ClickAsync();
             }
 
-            if (await btnRunReport.IsEnabledAsync())
+            if (await BtnRunReport.IsEnabledAsync())
             {
-                await btnRunReport.ClickAsync();
+                await BtnRunReport.ClickAsync();
             }
 
             var totalAccountsCreated = await Page.Locator("//table//tbody//tr").CountAsync();
@@ -741,21 +765,25 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await TxtReference.FillAsync(note);
             await TxtReference.ClearAsync();
 
-            // Get Yesterday's Date
+            // Get Yesterday's Date in "MM/dd/yyyy" format
             DateTime yesterday = DateTime.Now.AddDays(-1);
             string startDate = yesterday.ToString("MM/dd/yyyy");
 
-            // Enter start date
-            //await DateFunction(TxtStartDate.ToString()).WaitForAsync();
-            //await TxtStartDate.FillAsync(DateFunction(await TxtStartDate.InputValueAsync()));
-            await TxtStartDate.WaitForAsync();
-            //await TxtStartDate.ClearAsync();
-            await Task.Delay(1000);
-            await TxtStartDate.FillAsync(startDate);
+            // Wait for the date field to be visible
+            await TxtStartDate.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+            // Click to open the date picker
             await TxtStartDate.ClickAsync();
-            await TxtStartDate.FillAsync(startDate);
-            await Task.Delay(2000);
-           // await TxtStartDate.PressAsync("Tab");
+
+            // Select the correct date from the current month in the calendar
+            await _page.Locator($"//td[contains(@class, 'day') and not(contains(@class, 'old')) and text()='{yesterday.Day}']").ClickAsync();
+
+            // Verify the date is set correctly
+            string enteredDate = await TxtStartDate.InputValueAsync();
+            if (enteredDate != startDate)
+            {
+                throw new Exception($"Date selection failed! Expected: {startDate}, Found: {enteredDate}");
+            }
 
             // Check if the school ledger has family or user drop-down
 
