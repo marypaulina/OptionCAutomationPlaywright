@@ -53,7 +53,7 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
                 }
                 await mmPage.VerifyFeeManagementAsync(); // Open the Fee Management page                
                 objreport = await mmPage.LoopFilterAsync();// Loop through all MM reports and get values               
-                await mmPage.VerifyAccountStatusAsync(objreport, page);// Track account status                
+                await mmPage.VerifyAccountStatusAsync(objreport);// Track account status                
                 await mmPage.WriteAuditReportInExcel(objreport, ledgerPayments, dashboardAmount, i, startDate, auditTable.Rows.Count);// Write values to Excel               
                 if (auditTable.Rows.Count != i + 1)// Go back to Acutis after auditing one school
                 {
