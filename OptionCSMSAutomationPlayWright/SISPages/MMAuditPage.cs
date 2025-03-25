@@ -1,5 +1,4 @@
-﻿using IronXL;
-using IronXL.Styles;
+﻿using OfficeOpenXml;
 using Microsoft.Playwright;
 using NUnit.Framework;
 using OptionCSMSAutomationPlayWright.Model;
@@ -8,12 +7,13 @@ using IElementHandle = Microsoft.Playwright.IElementHandle;
 using IPage = Microsoft.Playwright.IPage;
 using Page = DocumentFormat.OpenXml.Spreadsheet.Page;
 using Path = System.IO.Path;
-using System.Drawing.Imaging;
-using System.Drawing;
-using System.Linq;
-using System.Text;
+using OfficeOpenXml;
+using OfficeOpenXml.Style;
+using System.IO;
 using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 using OpenQA.Selenium;
+using CsvHelper;
+
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -342,7 +342,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (await StaffCheck.IsVisibleAsync())
                 {
                     await StaffCheck.ClickAsync();
-                    await _page.WaitForTimeoutAsync(3000);
+                    await _page.WaitForTimeoutAsync(30000);
                 }
 
                 // Ensure 'Run Report' button is visible before clicking
@@ -351,6 +351,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (await BtnRunReport.IsEnabledAsync())
                 {
                     await BtnRunReport.ClickAsync();
+                    await _page.WaitForTimeoutAsync(30000);
                     Console.WriteLine("Run Report button clicked.");
                 }
                 else
@@ -480,9 +481,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         public async Task<ReportData> StartFilterAsync(Int64 ReportId, Report objReport)
         {
+
             var reportData = new ReportData();
             string getTransactionAmt = "0.00";
-
+            await Task.Delay(2000);
             // Get all open pages
             var allPages = _page.Context.Pages;
 
@@ -498,7 +500,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             if (lastPage == null)
             {
                 throw new Exception("Failed to switch to the last opened page.");
-                
+
             }
 
             // Update _page to reference the last page
@@ -520,9 +522,34 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             // Click appropriate filter button
             if (ReportId != 911)
+            {
+                //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
                 await BtnFilter.ClickAsync();
+                await Task.Delay(5000);
+            }
             else
-                await Btn911Filter.ClickAsync();
+            {
+                for (int i = 0; i < 5; i++) // Retry up to 5 times
+                {
+                    try
+                    {
+                        await Btn911Filter.ClickAsync(new() { Timeout = 100000 }); // Click with timeout
+                        break;
+                    }
+                    catch (TimeoutException)
+                    {
+                        Console.WriteLine("Retrying click...");
+                    }
+                    await Task.Delay(15000); // Wait 5 seconds before retrying
+                }
+
+                //await Task.Delay(60000); // Explicit wait for 60 seconds
+
+                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 60000 }); // Wait until network requests complete
+                await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60000 }); // Wait until the table is visible
+
+
+            }
 
             // Wait for the table to load
             IReadOnlyList<IElementHandle> tableRows;
@@ -648,7 +675,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
         public async Task FinalViewAsync()
         {
-            var filePath = @"C:\path\to\your\file.txt"; // Update with actual path
+            var filePath = @"D:\File\Audit Summary.txt"; // Update with actual path
+            //D:\File\Audit Summary.txt
 
             // Open Notepad and load the file
             System.Diagnostics.Process.Start("notepad.exe", filePath);
@@ -656,18 +684,20 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Optional delay (if needed for UI synchronization)
             await Task.Delay(5000);
         }
-       
+
 
         public async Task WriteAuditReportInExcel(
-        Report objReport,
-        LedgerPayments ledgerPayments = null,
-        DashboardAmount dashboardAmount = null,
-        int tab = 0,
-        string startDate = "",
-        long count = 0)
+     Report objReport,
+     LedgerPayments ledgerPayments = null,
+     DashboardAmount dashboardAmount = null,
+     int tab = 0,
+     string startDate = "",
+     long count = 0)
         {
+            await SchoolName.WaitForAsync(); // Wait for the school name element to be present
             string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";
-            long finalRow = tab + 4;
+
+            //long finalRow = tab + 4;
             string filePath = Path.Combine(directoryPath, "AuditSummary.xlsx");
 
             if (!Directory.Exists(directoryPath))
@@ -680,80 +710,144 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 File.Delete(filePath);
             }
 
-            WorkBook workBook = File.Exists(filePath) ? WorkBook.Load(filePath) : WorkBook.Create(ExcelFileFormat.XLSX);
-            WorkSheet workSheet = workBook.GetWorkSheet("2024-2025") ?? workBook.CreateWorkSheet("2024-2025");
-
-
-
-            int lastRow = tab + 2;
-
-            // Styling
-            workSheet[$"A2:T{finalRow}"].Style.Font.SetColor(Color.Purple);
-            workSheet[$"A2:T{finalRow}"].Style.SetBackgroundColor(Color.Lavender);
-
-            // Assigning values
-            workSheet[$"A{lastRow}"].Value = tab + 1;
-            workSheet[$"B{lastRow}"].Value = getSchoolName;
-            workSheet[$"C{lastRow}"].Value = startDate;
-            workSheet[$"D{lastRow}"].Value = dashboardAmount?.CCTotalAmount;
-            workSheet[$"E{lastRow}"].Value = dashboardAmount?.eCheckTotalAmount;
-            workSheet[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0");
-            workSheet[$"G{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalCharges ?? "0");
-            workSheet[$"H{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalPayment ?? "0");
-            workSheet[$"I{lastRow}"].Value = ConvertToDecimal(objReport?.Report904 ?? "0");
-            workSheet[$"J{lastRow}"].Value = ConvertToDecimal(objReport?.Report901 ?? "0");
-            workSheet[$"K{lastRow}"].Value = Math.Round(ConvertToDecimal(objReport?.Report901 ?? "0") * 1.5m / 100, 2);
-            workSheet[$"L{lastRow}"].Value = ConvertToDecimal(objReport?.Report905 ?? "0");
-            workSheet[$"M{lastRow}"].Value = ConvertToDecimal(objReport?.Report902 ?? "0");
-            workSheet[$"N{lastRow}"].Value = ConvertToDecimal(objReport?.Report911 ?? "0");
-            workSheet[$"O{lastRow}"].Value = ConvertToInt(objReport?.TotalPrimaryAccount ?? "0");
-            workSheet[$"P{lastRow}"].Value = ConvertToInt(objReport?.TotalAccountCreated ?? "0");
-            workSheet[$"Q{lastRow}"].Value = ConvertToInt(objReport?.CreditCardCount ?? "0");
-            workSheet[$"R{lastRow}"].Value = ConvertToInt(objReport?.ECheckCount ?? "0");
-            workSheet[$"S{lastRow}"].Value = objReport?.AccountStatus;
-            workSheet[$"T{lastRow}"].Value = objReport?.CompareResults;
-
-            // Conditional Formatting for Comparison Results
-            workSheet[$"T{lastRow}"].Style.Font.SetColor(
-                objReport?.CompareResults?.Contains("are not equal") == true ? Color.Red : Color.Green);
-
-            // Summary Rows
-            workSheet[$"C{finalRow - 1}"].Value = "Sub Total: ";
-            workSheet[$"C{finalRow - 1}"].Style.HorizontalAlignment = HorizontalAlignment.Right;
-
-            foreach (char column in "DEFGHIJKLMN")
+            using (ExcelPackage package = new ExcelPackage(new FileInfo(filePath)))
             {
-                string cellAddress = $"{column}{finalRow - 1}";
-                workSheet[cellAddress].Value = $"=SUM({column}2:{column}{finalRow - 2})"; // Set formula as a string
+                ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2024-2025")
+                                              ?? package.Workbook.Worksheets.Add("2024-2025");
+
+                int lastRow = tab + 2;
+                int headerRow = 1;
+                int dataStartRow = 2 + tab;
+                int finalRow = dataStartRow + 2;
+                // Define Column Headers (if it's a new sheet)
+                if (workSheet.Dimension == null || workSheet.Dimension.Rows == 0)
+                {
+                    string[] headers = {
+                        "S.No",
+                        "School Name",
+                        "Start Date",
+                        "CC Total",
+                        "eCheck Total",
+                        "Total Amount",
+                        "Total Charges",
+                        "Total Payments",
+                        "Report 904",
+                        "Report 901",
+                        "Processing Fee",
+                        "Report 905",
+                        "Report 902",
+                        "Report 911",
+                        "Primary Accounts",
+                        "Total Created",
+                        "CC Count",
+                        "eCheck Count",
+                        "Account Status",
+                        "Comparison Results"
+                    };
+
+                    for (int i = 0; i < headers.Length; i++)
+                    {
+                        var cell = workSheet.Cells[headerRow, i + 1];
+                        cell.Value = headers[i];
+                        cell.Style.Font.Bold = true;
+                        cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        cell.Style.Fill.BackgroundColor.SetColor(Color.Purple);
+                        cell.Style.Font.Color.SetColor(Color.White);
+                        cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
+                        cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                    }
+                }
+
+                // Assigning values
+                workSheet.Cells[$"A{lastRow}"].Value = tab + 1;
+                workSheet.Cells[$"B{lastRow}"].Value = getSchoolName;
+                workSheet.Cells[$"C{lastRow}"].Value = startDate;
+                workSheet.Cells[$"D{lastRow}"].Value = dashboardAmount?.CCTotalAmount;
+                workSheet.Cells[$"E{lastRow}"].Value = dashboardAmount?.eCheckTotalAmount;
+                workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0");
+                workSheet.Cells[$"G{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalCharges ?? "0");
+                workSheet.Cells[$"H{lastRow}"].Value = ConvertToDecimal(ledgerPayments?.TotalPayment ?? "0");
+                workSheet.Cells[$"I{lastRow}"].Value = ConvertToDecimal(objReport?.Report904 ?? "0");
+                workSheet.Cells[$"J{lastRow}"].Value = ConvertToDecimal(objReport?.Report901 ?? "0");
+                workSheet.Cells[$"K{lastRow}"].Value = Math.Round(ConvertToDecimal(objReport?.Report901 ?? "0") * 1.5m / 100, 2);
+                workSheet.Cells[$"L{lastRow}"].Value = ConvertToDecimal(objReport?.Report905 ?? "0");
+                workSheet.Cells[$"M{lastRow}"].Value = ConvertToDecimal(objReport?.Report902 ?? "0");
+                workSheet.Cells[$"N{lastRow}"].Value = ConvertToDecimal(objReport?.Report911 ?? "0");
+                workSheet.Cells[$"O{lastRow}"].Value = ConvertToInt(objReport?.TotalPrimaryAccount ?? "0");
+                workSheet.Cells[$"P{lastRow}"].Value = ConvertToInt(objReport?.TotalAccountCreated ?? "0");
+                workSheet.Cells[$"Q{lastRow}"].Value = ConvertToInt(objReport?.CreditCardCount ?? "0");
+                workSheet.Cells[$"R{lastRow}"].Value = ConvertToInt(objReport?.ECheckCount ?? "0");
+                workSheet.Cells[$"S{lastRow}"].Value = objReport?.AccountStatus;
+                workSheet.Cells[$"T{lastRow}"].Value = objReport?.CompareResults;
+
+
+                // Apply Row Formatting
+                for (int col = 1; col <= workSheet.Dimension.Columns; col++)
+                {
+                    var cell = workSheet.Cells[lastRow, col];
+                    cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                    cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                    cell.Style.Font.Size = 11;
+
+                    // Apply alternate row coloring
+                   
+                        cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        cell.Style.Fill.BackgroundColor.SetColor(Color.Lavender) ;
+                        cell.Style.Font.Color.SetColor(Color.Purple);
+                    
+
+                    // Number Formatting for Amount Columns
+                    if (col >= 4 && col <= 9) // Columns D to I are financial
+                    {
+                        cell.Style.Numberformat.Format = "#,##0.00";
+                    }
+                }
+
+                
+
+                // Conditional Formatting for Comparison Results
+                workSheet.Cells[$"T{lastRow}"].Style.Font.Color.SetColor(
+                    objReport?.CompareResults?.Contains("are not equal") == true ? Color.Red : Color.Green);
+
+                // Summary Rows
+                workSheet.Cells[$"C{finalRow - 1}"].Value = "Sub Total: ";
+                workSheet.Cells[$"C{finalRow - 1}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+
+                foreach (char column in "DEFGHIJKLMN")
+                {
+                    string cellAddress = $"{column}{finalRow - 1}";
+                    workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{finalRow - 2})";
+                }
+
+                workSheet.Cells[$"C{finalRow}"].Value = "Grand Total: ";
+                workSheet.Cells[$"C{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+                workSheet.Cells[$"D{finalRow}"].Formula = $"=F{finalRow - 1}";
+
+                // Formatting
+                workSheet.Cells[$"A1:T1"].Style.WrapText = true;
+                workSheet.Cells[$"R2:T{finalRow}"].Style.WrapText = true;
+                workSheet.Cells[$"A1:T{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                workSheet.View.ShowGridLines = false;
+
+                // Applying Borders
+                using (ExcelRange range = workSheet.Cells[$"A1:T{finalRow}"])
+                {
+                    range.Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                    range.Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                    range.Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                    range.Style.Border.Right.Style = ExcelBorderStyle.Thin;
+                    range.Style.Border.Top.Color.SetColor(Color.Black);
+                    range.Style.Border.Bottom.Color.SetColor(Color.Black);
+                    range.Style.Border.Left.Color.SetColor(Color.Black);
+                    range.Style.Border.Right.Color.SetColor(Color.Black);
+                }
+                // Auto-adjust column width
+                workSheet.Cells[workSheet.Dimension.Address].AutoFitColumns();
+                package.Save();
             }
-
-            workSheet[$"C{finalRow}"].Value = "Grand Total: ";
-            workSheet[$"C{finalRow}"].Style.HorizontalAlignment = HorizontalAlignment.Right;
-            workSheet[$"D{finalRow}"].Value = $"=F{finalRow - 1}";
-
-            // Formatting
-            workSheet[$"A1:T1"].Style.WrapText = true;
-            workSheet[$"R2:T{finalRow}"].Style.WrapText = true;
-            workSheet[$"A1:T{finalRow}"].Style.VerticalAlignment = VerticalAlignment.Center;
-            workSheet.DisplayGridlines = false;
-
-            // Applying Borders
-            for (char column = 'A'; column <= 'T'; column++)
-            {
-                string range = $"{column}1:{column}{finalRow}";
-                workSheet[range].Style.BottomBorder.SetColor(Color.Black);
-                workSheet[range].Style.BottomBorder.Type = BorderType.Thin;
-                workSheet[range].Style.TopBorder.SetColor(Color.Black);
-                workSheet[range].Style.TopBorder.Type = BorderType.Thin;
-                workSheet[range].Style.LeftBorder.SetColor(Color.Black);
-                workSheet[range].Style.LeftBorder.Type = BorderType.Thin;
-                workSheet[range].Style.RightBorder.SetColor(Color.Black);
-                workSheet[range].Style.RightBorder.Type = BorderType.Thin;
-            }
-
-            workBook.SaveAs(filePath);
             await FinalViewAsync();
         }
+
 
         // Helper Methods for Safe Conversion
         private decimal ConvertToDecimal(string value)
@@ -776,6 +870,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             // Wait for the alumni disabled user checkbox and click it
             await ChkAlumniDisableduser.WaitForAsync();
+            await Task.Delay(2000); // Explicit wait
             await ChkAlumniDisableduser.ClickAsync();
 
             await Task.Delay(5000); // Explicit wait

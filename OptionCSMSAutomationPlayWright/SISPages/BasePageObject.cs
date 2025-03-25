@@ -31,7 +31,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             return await _page.Locator(selector).InnerTextAsync();
         }
 
-        public async Task WaitForElementAsync(string selector, int timeout = 50000)
+        public async Task WaitForElementAsync(string selector, int timeout = 60000)
         {
             await _page.Locator(selector).WaitForAsync(new LocatorWaitForOptions { Timeout = timeout });
         }

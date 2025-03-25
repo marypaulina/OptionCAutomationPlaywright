@@ -59,6 +59,7 @@ namespace OptionCSMSAutomationPlayWright.Hooks
             {
                 Headless = false, // Set to true for headless mode if needed
                 ExecutablePath = ChromeExecutablePath
+
             });
 
             // Create a new context
@@ -83,7 +84,7 @@ namespace OptionCSMSAutomationPlayWright.Hooks
 
         [AfterStep]
         public async Task InsertReportingSteps(ScenarioContext scenarioContext)
-        {
+         {
             var stepType = ScenarioStepContext.Current.StepInfo.StepDefinitionType.ToString();
             if (scenarioContext.TestError == null)
             {
