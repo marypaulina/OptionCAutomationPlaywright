@@ -700,26 +700,27 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                                               ?? package.Workbook.Worksheets.Add("2024-2025");
 
                 // Set the column widths manually
-                workSheet.Columns[0].Width = 800;
-                workSheet.Columns[1].Width = 10000;
-                workSheet.Columns[2].Width = 4300;
-                workSheet.Columns[3].Width = 3500;
-                workSheet.Columns[4].Width = 3500;
-                workSheet.Columns[5].Width = 3500;
-                workSheet.Columns[6].Width = 3200;
-                workSheet.Columns[7].Width = 3300;
-                workSheet.Columns[8].Width = 3200;
-                workSheet.Columns[9].Width = 3700;
-                workSheet.Columns[10].Width = 2000;
-                workSheet.Columns[11].Width = 3100;
-                workSheet.Columns[12].Width = 3600;
-                workSheet.Columns[13].Width = 3600;
-                workSheet.Columns[14].Width = 2000;
-                workSheet.Columns[15].Width = 2000;
-                workSheet.Columns[16].Width = 2000;
-                workSheet.Columns[17].Width = 2800;
-                workSheet.Columns[18].Width = 25000;
-                workSheet.Columns[19].Width = 20000;
+                workSheet.Columns[1].Width = 5;
+                workSheet.Columns[2].Width = 25;
+                workSheet.Columns[3].Width = 20;
+                workSheet.Columns[4].Width = 15;
+                workSheet.Columns[5].Width = 15;
+                workSheet.Columns[6].Width = 15;
+                workSheet.Columns[7].Width = 14;
+                workSheet.Columns[8].Width = 14;
+                workSheet.Columns[9].Width = 14;
+                workSheet.Columns[10].Width = 18;
+                workSheet.Columns[11].Width = 10;
+                workSheet.Columns[12].Width = 13;
+                workSheet.Columns[13].Width = 16;
+                workSheet.Columns[14].Width = 16;
+                workSheet.Columns[15].Width = 10;
+                workSheet.Columns[16].Width = 10;
+                workSheet.Columns[17].Width = 10;
+                workSheet.Columns[18].Width = 14;
+                workSheet.Columns[19].Width = 30;
+                workSheet.Columns[20].Width = 35;
+              
 
                 int lastRow = tab + 2;
                 int headerRow = 1;
@@ -842,7 +843,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     range.Style.Border.Right.Color.SetColor(Color.Black);
                 }
                 // Auto-adjust column width
-                workSheet.Cells[workSheet.Dimension.Address].AutoFitColumns();
+                //workSheet.Cells[workSheet.Dimension.Address].AutoFitColumns();
                 package.Save();
             }
            // await FinalViewAsync();
