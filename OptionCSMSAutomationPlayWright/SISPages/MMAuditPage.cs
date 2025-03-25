@@ -699,6 +699,28 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2024-2025")
                                               ?? package.Workbook.Worksheets.Add("2024-2025");
 
+                // Set the column widths manually
+                workSheet.Columns[0].Width = 800;
+                workSheet.Columns[1].Width = 10000;
+                workSheet.Columns[2].Width = 4300;
+                workSheet.Columns[3].Width = 3500;
+                workSheet.Columns[4].Width = 3500;
+                workSheet.Columns[5].Width = 3500;
+                workSheet.Columns[6].Width = 3200;
+                workSheet.Columns[7].Width = 3300;
+                workSheet.Columns[8].Width = 3200;
+                workSheet.Columns[9].Width = 3700;
+                workSheet.Columns[10].Width = 2000;
+                workSheet.Columns[11].Width = 3100;
+                workSheet.Columns[12].Width = 3600;
+                workSheet.Columns[13].Width = 3600;
+                workSheet.Columns[14].Width = 2000;
+                workSheet.Columns[15].Width = 2000;
+                workSheet.Columns[16].Width = 2000;
+                workSheet.Columns[17].Width = 2800;
+                workSheet.Columns[18].Width = 25000;
+                workSheet.Columns[19].Width = 20000;
+
                 int lastRow = tab + 2;
                 int headerRow = 1;
                 int dataStartRow = 2 + tab;
