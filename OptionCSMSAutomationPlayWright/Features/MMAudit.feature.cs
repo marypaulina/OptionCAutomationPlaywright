@@ -122,17 +122,17 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
-                            "8990",
-                            "08/18/2024"});
-                table2.AddRow(new string[] {
-                            "8351",
-                            "07/11/2024"});
-                table2.AddRow(new string[] {
                             "8417",
                             "05/15/2024"});
                 table2.AddRow(new string[] {
                             "8545",
                             "08/19/2024"});
+                table2.AddRow(new string[] {
+                            "8351",
+                            "07/11/2024"});
+                table2.AddRow(new string[] {
+                            "8990",
+                            "08/18/2024"});
                 table2.AddRow(new string[] {
                             "142",
                             "09/10/2024"});

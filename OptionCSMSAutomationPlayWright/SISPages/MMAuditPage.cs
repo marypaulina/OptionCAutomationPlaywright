@@ -772,22 +772,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
                     cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                     cell.Style.Font.Size = 11;
-
-                    // Apply alternate row coloring
-                   
-                        cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                        cell.Style.Fill.BackgroundColor.SetColor(Color.Lavender) ;
-                        cell.Style.Font.Color.SetColor(Color.Purple);
-                    
-
+                    cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    cell.Style.Fill.BackgroundColor.SetColor(Color.Lavender);
+                    cell.Style.Font.Color.SetColor(Color.Purple);
                     // Number Formatting for Amount Columns
                     if (col >= 4 && col <= 9) // Columns D to I are financial
                     {
                         cell.Style.Numberformat.Format = "#,##0.00";
                     }
                 }
-
-                
 
                 // Conditional Formatting for Comparison Results
                 workSheet.Cells[$"T{lastRow}"].Style.Font.Color.SetColor(
@@ -811,6 +804,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"A1:T1"].Style.WrapText = true;
                 workSheet.Cells[$"R2:T{finalRow}"].Style.WrapText = true;
                 workSheet.Cells[$"A1:T{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                //workSheet.Cells[$"A1:T{finalRow}"].Style.Font.Bold = true;
                 workSheet.View.ShowGridLines = false;
 
                 // Applying Borders
@@ -829,7 +823,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[workSheet.Dimension.Address].AutoFitColumns();
                 package.Save();
             }
-            await FinalViewAsync();
+           // await FinalViewAsync();
         }
 
 
