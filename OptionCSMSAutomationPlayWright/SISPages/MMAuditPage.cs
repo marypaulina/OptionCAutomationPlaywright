@@ -529,27 +529,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             else
             {
-                for (int i = 0; i < 5; i++) // Retry up to 5 times
-                {
-                    try
-                    {
-                        await Btn911Filter.ClickAsync(new() { Timeout = 100000 }); // Click with timeout
-                        break;
-                    }
-                    catch (TimeoutException)
-                    {
-                        Console.WriteLine("Retrying click...");
-                    }
-                    await Task.Delay(15000); // Wait 5 seconds before retrying
-                }
-
-                //await Task.Delay(60000); // Explicit wait for 60 seconds
-
+                await Btn911Filter.ClickAsync(new() { Timeout = 250000 }); // Click with timeout
                 await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 60000 }); // Wait until network requests complete
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60000 }); // Wait until the table is visible
-
-
             }
+
 
             // Wait for the table to load
             IReadOnlyList<IElementHandle> tableRows;
