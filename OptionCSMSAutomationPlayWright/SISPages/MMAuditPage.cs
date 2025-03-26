@@ -124,7 +124,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         //1. Load URL method    
         public async Task LoadURLAsync(string URL)
         {
-            await _page.GotoAsync(URL);
+            await _page.GotoAsync(URL, new() { Timeout = 80000 });
             //await _page.SetViewportSizeAsync(1920, 1080);
             Console.WriteLine($"The Given URL is: {URL}");
         }
@@ -156,7 +156,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             var waitForNewPage = _page.Context.WaitForPageAsync(); // Prepare to wait for the new page before clicking
 
-            await IconNextGen.ClickAsync(); // Click the NextGen icon (which opens a new tab)
+            await IconNextGen.First.ClickAsync(new() { Timeout = 20000 }); // Click the NextGen icon (which opens a new tab)
 
             var newPage = await waitForNewPage; // Wait for the new page to be created
 
@@ -179,8 +179,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         // To navigate back to the Acutis domain
         public async Task BackToAcutisAsync()
-        {           
-            await _page.GotoAsync("https://acutis.optionc.com/school-details");// Navigate to the Acutis school details page
+        {
+            await _page.GotoAsync("https://acutis.optionc.com/school-details", new() { Timeout = 80000 });
+            // Navigate to the Acutis school details page
         }
 
         public async Task<bool> VerifyAdminDashboardAsync()
@@ -220,8 +221,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task NavigateToFeeManagementAsync()
         {
             // Wait for the Administration menu to be visible and click it
-            await AdministrationMenu.WaitForAsync();
-            await AdministrationMenu.ClickAsync();
+            //await AdministrationMenu.First.WaitForAsync();
+            await AdministrationMenu.First.ClickAsync(new() { Timeout = 60000 });
 
             // Wait for the Fee Management menu to be visible and click it
             await FeeManagementMenu.WaitForAsync();
@@ -341,7 +342,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // Click on StaffCheck if visible
                 if (await StaffCheck.IsVisibleAsync())
                 {
-                    await StaffCheck.ClickAsync();
+                    await StaffCheck.ClickAsync(new() { Timeout = 10000 });
                     await _page.WaitForTimeoutAsync(30000);
                 }
 
@@ -350,7 +351,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 if (await BtnRunReport.IsEnabledAsync())
                 {
-                    await BtnRunReport.ClickAsync();
+                    await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
                     await _page.WaitForTimeoutAsync(30000);
                     Console.WriteLine("Run Report button clicked.");
                 }
@@ -401,7 +402,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // Click 'Run Report' again
                 if (await BtnRunReport.IsEnabledAsync())
                 {
-                    await BtnRunReport.ClickAsync();
+                    await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
                     Console.WriteLine("Run Report clicked again.");
                 }
                 else
@@ -484,7 +485,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             var reportData = new ReportData();
             string getTransactionAmt = "0.00";
-            await Task.Delay(2000);
+            await Task.Delay(3000);
             // Get all open pages
             var allPages = _page.Context.Pages;
 
@@ -524,7 +525,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             if (ReportId != 911)
             {
                 //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
-                await BtnFilter.ClickAsync();
+                await BtnFilter.ClickAsync(new() { Timeout = 20000 });
                 await Task.Delay(5000);
             }
             else
@@ -701,8 +702,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 // Set the column widths manually
                 workSheet.Columns[1].Width = 5;
-                workSheet.Columns[2].Width = 25;
-                workSheet.Columns[3].Width = 20;
+                workSheet.Columns[2].Width = 45;
+                workSheet.Columns[3].Width = 15;
                 workSheet.Columns[4].Width = 15;
                 workSheet.Columns[5].Width = 15;
                 workSheet.Columns[6].Width = 15;
@@ -718,8 +719,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Columns[16].Width = 10;
                 workSheet.Columns[17].Width = 10;
                 workSheet.Columns[18].Width = 14;
-                workSheet.Columns[19].Width = 30;
-                workSheet.Columns[20].Width = 35;
+                workSheet.Columns[19].Width = 65;
+                workSheet.Columns[20].Width = 65;
               
 
                 int lastRow = tab + 2;
@@ -730,26 +731,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (workSheet.Dimension == null || workSheet.Dimension.Rows == 0)
                 {
                     string[] headers = {
-                        "S.No",
+                        "#",
                         "School Name",
-                        "Start Date",
-                        "CC Total",
-                        "eCheck Total",
-                        "Total Amount",
-                        "Total Charges",
-                        "Total Payments",
-                        "Report 904",
-                        "Report 901",
-                        "Processing Fee",
-                        "Report 905",
-                        "Report 902",
-                        "Report 911",
-                        "Primary Accounts",
-                        "Total Created",
-                        "CC Count",
-                        "eCheck Count",
-                        "Account Status",
-                        "Comparison Results"
+                        "Date From",
+                        "CC Total Amount (Dashboard)",
+                        "eCheck Total Amount (Dashboard)",
+                        "Total Amount (Dashboard)",
+                        "Last Charges (Last 24 hrs)",
+                        "Last Payment using MM (Last 24 hrs)",
+                        "CC Amount in New Status (904)",
+                        "eCheck Amount in New Status (901)",
+                        "Service Fee Amount",
+                        "CC Amt Funded (905) as on today",
+                        "eCheck Amt Funded (902) as on today",
+                        "Tot Amt Funded (911) as on today",
+                        "Total Primary Acc.",
+                        "Total Acc. Created",
+                        "Total CC Acc. Created",
+                        "Total eCheck Acc. Created",
+                        "New/ InProgress Account",
+                        "Funding Amount vs Transaction Amount (902 & 905)"
                     };
 
                     for (int i = 0; i < headers.Length; i++)
@@ -758,7 +759,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         cell.Value = headers[i];
                         cell.Style.Font.Bold = true;
                         cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                        cell.Style.Fill.BackgroundColor.SetColor(Color.Purple);
+                        cell.Style.Fill.BackgroundColor.SetColor(Color.DarkGoldenrod);
                         cell.Style.Font.Color.SetColor(Color.White);
                         cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                         cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
@@ -792,12 +793,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 for (int col = 1; col <= workSheet.Dimension.Columns; col++)
                 {
                     var cell = workSheet.Cells[lastRow, col];
-                    cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                    cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                     cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                     cell.Style.Font.Size = 11;
                     cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    cell.Style.Fill.BackgroundColor.SetColor(Color.Lavender);
-                    cell.Style.Font.Color.SetColor(Color.Purple);
+                    cell.Style.Fill.BackgroundColor.SetColor(Color.PaleGoldenrod);
+                    cell.Style.Font.Color.SetColor(Color.DarkGoldenrod);
                     // Number Formatting for Amount Columns
                     if (col >= 4 && col <= 9) // Columns D to I are financial
                     {
@@ -827,7 +828,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"A1:T1"].Style.WrapText = true;
                 workSheet.Cells[$"R2:T{finalRow}"].Style.WrapText = true;
                 workSheet.Cells[$"A1:T{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
-                //workSheet.Cells[$"A1:T{finalRow}"].Style.Font.Bold = true;
+                workSheet.Cells[$"A1:T{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
+                //workSheet.Cells[$"A1:T{finalRow}"].Style.Fill.BackgroundColor.SetColor(Color.Lavender);
+                //workSheet.Cells[$"A1:T{finalRow}"].Style.Font.Color.SetColor(Color.Purple);
+               // await IconNextGen.First.ClickAsync();
+                workSheet.Cells[$"A1:T{finalRow}"].Style.Font.Bold = true;
                 workSheet.View.ShowGridLines = false;
 
                 // Applying Borders
