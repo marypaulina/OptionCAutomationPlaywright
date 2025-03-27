@@ -124,7 +124,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         //1. Load URL method    
         public async Task LoadURLAsync(string URL)
         {
-            await _page.GotoAsync(URL, new() { Timeout = 80000 });
+            await _page.GotoAsync(URL, new() { Timeout = 100000 });
             //await _page.SetViewportSizeAsync(1920, 1080);
             Console.WriteLine($"The Given URL is: {URL}");
         }
@@ -351,7 +351,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 if (await BtnRunReport.IsEnabledAsync())
                 {
-                    await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
+                    await BtnRunReport.ClickAsync(new() { Timeout = 30000 });
                     await _page.WaitForTimeoutAsync(30000);
                     Console.WriteLine("Run Report button clicked.");
                 }
@@ -701,25 +701,25 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                                               ?? package.Workbook.Worksheets.Add("2024-2025");
 
                 // Set the column widths manually
-                workSheet.Columns[1].Width = 5;
-                workSheet.Columns[2].Width = 45;
-                workSheet.Columns[3].Width = 15;
-                workSheet.Columns[4].Width = 15;
-                workSheet.Columns[5].Width = 15;
-                workSheet.Columns[6].Width = 15;
-                workSheet.Columns[7].Width = 14;
-                workSheet.Columns[8].Width = 14;
-                workSheet.Columns[9].Width = 14;
-                workSheet.Columns[10].Width = 18;
+                workSheet.Columns[1].Width = 3;
+                workSheet.Columns[2].Width = 35;
+                workSheet.Columns[3].Width = 13;
+                workSheet.Columns[4].Width = 13;
+                workSheet.Columns[5].Width = 13;
+                workSheet.Columns[6].Width = 13;
+                workSheet.Columns[7].Width = 12;
+                workSheet.Columns[8].Width = 12;
+                workSheet.Columns[9].Width = 12;
+                workSheet.Columns[10].Width = 12;
                 workSheet.Columns[11].Width = 10;
                 workSheet.Columns[12].Width = 13;
-                workSheet.Columns[13].Width = 16;
-                workSheet.Columns[14].Width = 16;
-                workSheet.Columns[15].Width = 10;
-                workSheet.Columns[16].Width = 10;
+                workSheet.Columns[13].Width = 15;
+                workSheet.Columns[14].Width = 15;
+                workSheet.Columns[15].Width = 8;
+                workSheet.Columns[16].Width = 8;
                 workSheet.Columns[17].Width = 10;
-                workSheet.Columns[18].Width = 14;
-                workSheet.Columns[19].Width = 65;
+                workSheet.Columns[18].Width = 10;
+                workSheet.Columns[19].Width = 63;
                 workSheet.Columns[20].Width = 65;
               
 
@@ -759,7 +759,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         cell.Value = headers[i];
                         cell.Style.Font.Bold = true;
                         cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                        cell.Style.Fill.BackgroundColor.SetColor(Color.DarkGoldenrod);
+                        cell.Style.Fill.BackgroundColor.SetColor(Color.DarkOliveGreen);
                         cell.Style.Font.Color.SetColor(Color.White);
                         cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                         cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
@@ -770,6 +770,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"A{lastRow}"].Value = tab + 1;
                 workSheet.Cells[$"B{lastRow}"].Value = getSchoolName;
                 workSheet.Cells[$"C{lastRow}"].Value = startDate;
+                /*
+                 * workSheet.Cells[$"D{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.CCTotalAmount ?? "0").ToString("C2");
+workSheet.Cells[$"E{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.eCheckTotalAmount ?? "0").ToString("C2");
+workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0").ToString("C2");
+
+                 */
                 workSheet.Cells[$"D{lastRow}"].Value = dashboardAmount?.CCTotalAmount;
                 workSheet.Cells[$"E{lastRow}"].Value = dashboardAmount?.eCheckTotalAmount;
                 workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0");
@@ -797,10 +803,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                     cell.Style.Font.Size = 11;
                     cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    cell.Style.Fill.BackgroundColor.SetColor(Color.PaleGoldenrod);
-                    cell.Style.Font.Color.SetColor(Color.DarkGoldenrod);
+                    cell.Style.Fill.BackgroundColor.SetColor(Color.MintCream);
+                    cell.Style.Font.Color.SetColor(Color.DarkOliveGreen);
                     // Number Formatting for Amount Columns
-                    if (col >= 4 && col <= 9) // Columns D to I are financial
+                    if (col >= 4 && col <= 14) // Columns D to I are financial
                     {
                         cell.Style.Numberformat.Format = "#,##0.00";
                     }
@@ -829,10 +835,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"R2:T{finalRow}"].Style.WrapText = true;
                 workSheet.Cells[$"A1:T{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                 workSheet.Cells[$"A1:T{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
-                //workSheet.Cells[$"A1:T{finalRow}"].Style.Fill.BackgroundColor.SetColor(Color.Lavender);
-                //workSheet.Cells[$"A1:T{finalRow}"].Style.Font.Color.SetColor(Color.Purple);
-               // await IconNextGen.First.ClickAsync();
-                workSheet.Cells[$"A1:T{finalRow}"].Style.Font.Bold = true;
                 workSheet.View.ShowGridLines = false;
 
                 // Applying Borders
@@ -843,7 +845,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     range.Style.Border.Left.Style = ExcelBorderStyle.Thin;
                     range.Style.Border.Right.Style = ExcelBorderStyle.Thin;
                     range.Style.Border.Top.Color.SetColor(Color.Black);
-                    range.Style.Border.Bottom.Color.SetColor(Color.Black);
+                    range.Style.Border.Bottom.Color.SetColor(Color.DarkOliveGreen);
                     range.Style.Border.Left.Color.SetColor(Color.Black);
                     range.Style.Border.Right.Color.SetColor(Color.Black);
                 }
@@ -1199,7 +1201,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await BtnCustomFilter.WaitForAsync();
             await BtnCustomFilter.ClickAsync();
 
-            await _page.WaitForTimeoutAsync(1000); // Instead of Thread.Sleep
+            await _page.WaitForTimeoutAsync(3000); // Instead of Thread.Sleep
 
             string CCTotAmt = "0";
             string eCheckTotAmt = "0";
