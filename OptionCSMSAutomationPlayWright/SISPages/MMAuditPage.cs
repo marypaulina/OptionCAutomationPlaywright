@@ -672,12 +672,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
 
         public async Task WriteAuditReportInExcel(
-     Report objReport,
-     LedgerPayments ledgerPayments = null,
-     DashboardAmount dashboardAmount = null,
-     int tab = 0,
-     string startDate = "",
-     long count = 0)
+        Report objReport,
+        LedgerPayments ledgerPayments = null,
+        DashboardAmount dashboardAmount = null,
+        int tab = 0,
+        string startDate = "",
+        long count = 0)
         {
             await SchoolName.WaitForAsync(); // Wait for the school name element to be present
             string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";
@@ -720,9 +720,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Columns[17].Width = 10;
                 workSheet.Columns[18].Width = 10;
                 workSheet.Columns[19].Width = 63;
-                workSheet.Columns[20].Width = 65;
-              
-
+                workSheet.Columns[20].Width = 65;             
                 int lastRow = tab + 2;
                 int headerRow = 1;
                 int dataStartRow = 2 + tab;
@@ -765,17 +763,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                     }
                 }
-
                 // Assigning values
                 workSheet.Cells[$"A{lastRow}"].Value = tab + 1;
                 workSheet.Cells[$"B{lastRow}"].Value = getSchoolName;
                 workSheet.Cells[$"C{lastRow}"].Value = startDate;
-                /*
-                 * workSheet.Cells[$"D{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.CCTotalAmount ?? "0").ToString("C2");
-workSheet.Cells[$"E{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.eCheckTotalAmount ?? "0").ToString("C2");
-workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0").ToString("C2");
-
-                 */
                 workSheet.Cells[$"D{lastRow}"].Value = dashboardAmount?.CCTotalAmount;
                 workSheet.Cells[$"E{lastRow}"].Value = dashboardAmount?.eCheckTotalAmount;
                 workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAmount ?? "0");
@@ -793,8 +784,6 @@ workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAm
                 workSheet.Cells[$"R{lastRow}"].Value = ConvertToInt(objReport?.ECheckCount ?? "0");
                 workSheet.Cells[$"S{lastRow}"].Value = objReport?.AccountStatus;
                 workSheet.Cells[$"T{lastRow}"].Value = objReport?.CompareResults;
-
-
                 // Apply Row Formatting
                 for (int col = 1; col <= workSheet.Dimension.Columns; col++)
                 {
@@ -808,7 +797,7 @@ workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAm
                     // Number Formatting for Amount Columns
                     if (col >= 4 && col <= 14) // Columns D to I are financial
                     {
-                        cell.Style.Numberformat.Format = "#,##0.00";
+                        cell.Style.Numberformat.Format = "$#,##0.00";
                     }
                 }
 
@@ -820,10 +809,21 @@ workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAm
                 workSheet.Cells[$"C{finalRow - 1}"].Value = "Sub Total: ";
                 workSheet.Cells[$"C{finalRow - 1}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
 
-                foreach (char column in "DEFGHIJKLMN")
+                foreach (char column in "DEFGHIJKLMNOPQR")
                 {
                     string cellAddress = $"{column}{finalRow - 1}";
                     workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{finalRow - 2})";
+
+                    if ("OPQR".Contains(column))
+                    {
+                        // Ensure whole numbers without decimals for OPQR
+                        workSheet.Cells[cellAddress].Style.Numberformat.Format = "0";
+                    }
+                    else
+                    {
+                        // Apply US currency format ($ and two decimal places) for D to N
+                        workSheet.Cells[cellAddress].Style.Numberformat.Format = "$#,##0.00";
+                    }
                 }
 
                 workSheet.Cells[$"C{finalRow}"].Value = "Grand Total: ";
@@ -849,11 +849,8 @@ workSheet.Cells[$"F{lastRow}"].Value = ConvertToDecimal(dashboardAmount?.TotalAm
                     range.Style.Border.Left.Color.SetColor(Color.Black);
                     range.Style.Border.Right.Color.SetColor(Color.Black);
                 }
-                // Auto-adjust column width
-                //workSheet.Cells[workSheet.Dimension.Address].AutoFitColumns();
                 package.Save();
             }
-           // await FinalViewAsync();
         }
 
 
