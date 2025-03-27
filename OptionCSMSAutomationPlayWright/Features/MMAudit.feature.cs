@@ -125,6 +125,9 @@ this.ScenarioInitialize(scenarioInfo);
                             "7304",
                             "06/10/2024"});
                 table2.AddRow(new string[] {
+                            "5158",
+                            "06/18/2024"});
+                table2.AddRow(new string[] {
                             "8518",
                             "06/20/2024"});
                 table2.AddRow(new string[] {
@@ -133,9 +136,6 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "7301 St. Bridget School - River Falls",
                             "07/23/2024"});
-                table2.AddRow(new string[] {
-                            "5158",
-                            "06/18/2024"});
                 table2.AddRow(new string[] {
                             "8232",
                             "08/21/2024"});
