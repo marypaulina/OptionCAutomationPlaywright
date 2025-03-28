@@ -149,6 +149,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await MenuSchool.ClickAsync();
         }
 
+
+        public async Task MaxWindow()
+        {
+            // **Ensure the new page is maximized**
+            await _page.SetViewportSizeAsync(1500, 1080); // Resize the viewport
+            await _page.EvaluateAsync("window.moveTo(0, 0); window.resizeTo(screen.width, screen.height);"); // Maximize using JavaScript
+        }
+
         public async Task OpenSchoolAsync(string searchSchool)
         {
             await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name    
@@ -169,6 +177,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await _page.CloseAsync(); // Close the current page only if it's still open
             }
             _page = newPage; // Update _page to reference the new page
+
+            await MaxWindow();
+
             await _page.BringToFrontAsync(); // Bring the new page to the front
             await VerifyAdminDashboardAsync(); // Verify that the admin dashboard is displayed
         }
@@ -176,7 +187,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         // To navigate back to the Acutis domain
         public async Task BackToAcutisAsync()
         {
-            await _page.GotoAsync("https://acutis.optionc.com/school-details", new() { Timeout = 80000 });
+            await MaxWindow();
+            await _page.GotoAsync("https://acutis.optionc.com/school-details", new() { Timeout = 100000 });
             // Navigate to the Acutis school details page
         }
 
@@ -245,7 +257,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             // Wait for the search box
             await FeeReportsSearch.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
-
+            await MaxWindow();
             if (!await FeeReportsSearch.IsEnabledAsync())
             {
                 Console.WriteLine("Fee reports search box is not enabled.");
@@ -264,6 +276,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             Console.WriteLine($"{reportId} report is searched");
             await FeeReportsFirst.ClickAsync();
+            await MaxWindow();
             await Task.Delay(1000);
             return (true, reportId);
         }
@@ -313,8 +326,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             try
             {
+                await MaxWindow();
                 await _page.GotoAsync("https://feemanagement.optionc.com/report-list");
                 await SearchFeeReportAsync(907, _page);
+                await MaxWindow();
                 var pages = _page.Context.Pages;
                 // Ensure multiple pages exist before switching
                 if (pages.Count > 1)
@@ -585,9 +600,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                     foreach (var reportId in reportIds)
                     {
+                        await MaxWindow();
                         await _page.GotoAsync("https://feemanagement.optionc.com/report-list");
 
                         await SearchFeeReportAsync(reportId, _page);
+                        await MaxWindow();
                         ReportData reportData = await StartFilterAsync(reportId, objReport);
 
                         switch (reportId)

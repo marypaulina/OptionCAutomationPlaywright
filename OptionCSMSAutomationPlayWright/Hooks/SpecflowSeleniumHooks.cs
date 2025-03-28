@@ -69,14 +69,13 @@ namespace OptionCSMSAutomationPlayWright.Hooks
             _page = await context.NewPageAsync();
 
             // Set a large viewport size
-            await _page.SetViewportSizeAsync(1500, 700); // Set according to your screen size
+            await _page.SetViewportSizeAsync(1500, 1080); // Set according to your screen size
 
-            // Optionally, you can reposition the browser window using the DevTools Protocol
-            // Note: This doesn't directly maximize the window but allows for custom sizing
-            await _page.EvaluateAsync(@"window.resizeTo(screen.width, screen.height);");
-
-            // Bring the page to the front for visibility
-            await _page.BringToFrontAsync();
+            //await _page.EvaluateAsync(@"window.resizeTo(screen.width, screen.height);");
+            await _page.EvaluateAsync("window.moveTo(0, 0); window.resizeTo(screen.width, screen.height);"); // Maximize using JavaScript
+        
+        // Bring the page to the front for visibility
+        await _page.BringToFrontAsync();
 
             // Register the page instance
             container.RegisterInstanceAs<IPage>(_page);
