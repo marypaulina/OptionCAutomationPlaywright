@@ -229,7 +229,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             // Wait for the Administration menu to be visible and click it
             //await AdministrationMenu.First.WaitForAsync();
-            await AdministrationMenu.First.ClickAsync(new() { Timeout = 60000 });
+            await AdministrationMenu.First.ClickAsync(new() { Timeout = 100000 });
 
             // Wait for the Fee Management menu to be visible and click it
             await FeeManagementMenu.WaitForAsync();
@@ -327,7 +327,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 await MaxWindow();
-                await _page.GotoAsync("https://feemanagement.optionc.com/report-list");
+                await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
                 await SearchFeeReportAsync(907, _page);
                 await MaxWindow();
                 var pages = _page.Context.Pages;
@@ -511,7 +511,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             else
             {
-                await Btn911Filter.ClickAsync(new() { Timeout = 250000 }); // Click with timeout
+                await Btn911Filter.ClickAsync(new() { Timeout = 180000 }); // Click with timeout
                 await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 60000 }); // Wait until network requests complete
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60000 }); // Wait until the table is visible
             }
@@ -601,7 +601,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     foreach (var reportId in reportIds)
                     {
                         await MaxWindow();
-                        await _page.GotoAsync("https://feemanagement.optionc.com/report-list");
+                        await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
 
                         await SearchFeeReportAsync(reportId, _page);
                         await MaxWindow();
@@ -1131,6 +1131,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             string endDate = today.ToString("MM/dd/yyyy");         
             await TxtStartDate.WaitForAsync();
             await TxtStartDate.FillAsync(DateFunction(startDate));
+            await Task.Delay(2000);
             await TxtStartDate.PressAsync("Tab");
             await TxtEndDate.WaitForAsync();
             await TxtEndDate.FillAsync(DateFunction(endDate));
