@@ -355,8 +355,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 if (await BtnRunReport.IsEnabledAsync())
                 {
-                    await BtnRunReport.ClickAsync(new() { Timeout = 30000 });
-                    await _page.WaitForTimeoutAsync(30000);
+                    await BtnRunReport.ClickAsync(new() { Timeout = 100000 });
+                    await _page.WaitForTimeoutAsync(100000);
                     Console.WriteLine("Run Report button clicked.");
                 }
                 else
@@ -1132,7 +1132,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             DateTime today = DateTime.Now;
             string endDate = today.ToString("MM/dd/yyyy");         
             await TxtStartDate.WaitForAsync();
-            await TxtStartDate.FillAsync(DateFunction(startDate));
+            await TxtStartDate.FillAsync(DateFunction(startDate), new() { Force = true });
+           // await _page.EvaluateAsync("document.querySelector('#txtStartDate').value = arguments[0];", DateFunction(startDate));
+
             await Task.Delay(2000);
             await TxtStartDate.PressAsync("Tab");
             await TxtEndDate.WaitForAsync();
