@@ -13,6 +13,7 @@ using System.IO;
 using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 using OpenQA.Selenium;
 using CsvHelper;
+using OpenQA.Selenium.BiDi.Modules.BrowsingContext;
 
 
 namespace OptionCSMSAutomationPlayWright.SISPages
@@ -902,7 +903,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Click to open the date picker
             await TxtStartDate.ClickAsync();
             // Select the correct date from the current month in the calendar
-            await _page.Locator($"//td[contains(@class, 'day') and not(contains(@class, 'old')) and text()='{yesterday.Day}']").ClickAsync();
+            await _page.Locator("//td[contains(@class, 'new') and contains(@class, 'day') and text()='1']").ClickAsync();
+            //await _page.Locator($"//td[contains(@class, 'day') and not(contains(@class, 'old')) and text()='{yesterday.Day}']").ClickAsync();
             // Verify the date is set correctly
             string enteredDate = await TxtStartDate.InputValueAsync();
             if (enteredDate != startDate)
