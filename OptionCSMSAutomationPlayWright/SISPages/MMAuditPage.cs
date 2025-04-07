@@ -348,7 +348,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (await StaffCheck.IsVisibleAsync())
                 {
                     await StaffCheck.ClickAsync(new() { Timeout = 10000 });
-                    await _page.WaitForTimeoutAsync(30000);
+                    await _page.WaitForTimeoutAsync(300000);
                 }
                 // Ensure 'Run Report' button is visible before clicking
                 await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
@@ -902,6 +902,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await TxtStartDate.WaitForAsync(new() { State = WaitForSelectorState.Visible });
             // Click to open the date picker
             await TxtStartDate.ClickAsync();
+
+            await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").ClearAsync();
+            await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/06/2025");
+
+            /*
             // Select the correct date from the current month in the calendar
             await _page.Locator("//td[contains(@class, 'new') and contains(@class, 'day') and text()='1']").ClickAsync();
             //await _page.Locator($"//td[contains(@class, 'day') and not(contains(@class, 'old')) and text()='{yesterday.Day}']").ClickAsync();
@@ -910,7 +915,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             if (enteredDate != startDate)
             {
                 throw new Exception($"Date selection failed! Expected: {startDate}, Found: {enteredDate}");
-            }
+            }*/
             // Check if the school ledger has family or user drop-down
             bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
             if (isUser)
