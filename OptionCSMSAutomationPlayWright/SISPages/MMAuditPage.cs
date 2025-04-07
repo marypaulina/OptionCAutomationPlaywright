@@ -257,7 +257,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task<(bool, long)> SearchFeeReportAsync(long reportId, IPage page)
         {
             // Wait for the search box
-            await FeeReportsSearch.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            await FeeReportsSearch.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 10000 // Timeout in milliseconds (10 seconds)
+            });
+
             await MaxWindow();
             if (!await FeeReportsSearch.IsEnabledAsync())
             {
@@ -348,7 +353,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (await StaffCheck.IsVisibleAsync())
                 {
                     await StaffCheck.ClickAsync(new() { Timeout = 10000 });
-                    await _page.WaitForTimeoutAsync(300000);
+                    await _page.WaitForTimeoutAsync(30000);
                 }
                 // Ensure 'Run Report' button is visible before clicking
                 await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
@@ -512,7 +517,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             else
             {
-                await Btn911Filter.ClickAsync(new() { Timeout = 180000 }); // Click with timeout
+                await Btn911Filter.ClickAsync(new() { Timeout = 300000 }); // Click with timeout
                 await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 60000 }); // Wait until network requests complete
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60000 }); // Wait until the table is visible
             }
@@ -759,7 +764,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     cell.Style.Font.Size = 11;
                     cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
                     cell.Style.Fill.BackgroundColor.SetColor(Color.MintCream);
-                    cell.Style.Font.Color.SetColor(Color.DarkOliveGreen);
+                    cell.Style.Font.Color.SetColor(Color.Black);
                     // Number Formatting for Amount Columns
                     if (col >= 4 && col <= 14) // Columns D to I are financial
                     {
@@ -904,6 +909,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await TxtStartDate.ClickAsync();
 
             await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").ClearAsync();
+            //Change the date into prvious date daily
             await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/06/2025");
 
             /*
