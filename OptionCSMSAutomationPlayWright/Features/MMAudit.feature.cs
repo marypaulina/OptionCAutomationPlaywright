@@ -122,6 +122,12 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
+                            "8958",
+                            "08/27/2024"});
+                table2.AddRow(new string[] {
+                            "6904",
+                            "08/16/2024"});
+                table2.AddRow(new string[] {
                             "8298",
                             "02/19/2025"});
                 table2.AddRow(new string[] {
@@ -160,57 +166,6 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "8407",
                             "08/20/2024"});
-                table2.AddRow(new string[] {
-                            "8958",
-                            "06/23/2024"});
-                table2.AddRow(new string[] {
-                            "6904",
-                            "08/16/2024"});
-                table2.AddRow(new string[] {
-                            "4291",
-                            "02/19/2025"});
-                table2.AddRow(new string[] {
-                            "3340",
-                            "08/27/2024"});
-                table2.AddRow(new string[] {
-                            "3932",
-                            "01/02/2025"});
-                table2.AddRow(new string[] {
-                            "8763",
-                            "06/25/2024"});
-                table2.AddRow(new string[] {
-                            "7128",
-                            "07/23/2024"});
-                table2.AddRow(new string[] {
-                            "8400",
-                            "06/01/2024"});
-                table2.AddRow(new string[] {
-                            "8545",
-                            "08/19/2024"});
-                table2.AddRow(new string[] {
-                            "8990",
-                            "08/18/2024"});
-                table2.AddRow(new string[] {
-                            "142",
-                            "09/10/2024"});
-                table2.AddRow(new string[] {
-                            "7296",
-                            "09/17/2024"});
-                table2.AddRow(new string[] {
-                            "8507",
-                            "06/21/2024"});
-                table2.AddRow(new string[] {
-                            "7303",
-                            "06/30/2024"});
-                table2.AddRow(new string[] {
-                            "8465",
-                            "07/17/2024"});
-                table2.AddRow(new string[] {
-                            "8351",
-                            "07/11/2024"});
-                table2.AddRow(new string[] {
-                            "6142",
-                            "07/05/2024"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden

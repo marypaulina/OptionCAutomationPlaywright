@@ -14,7 +14,7 @@ using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 using OpenQA.Selenium;
 using CsvHelper;
 using OpenQA.Selenium.BiDi.Modules.BrowsingContext;
-
+using System.Globalization;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -352,18 +352,27 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // Click on StaffCheck if visible
                 if (await StaffCheck.IsVisibleAsync())
                 {
-                    await StaffCheck.ClickAsync(new() { Timeout = 10000 });
-                    await _page.WaitForTimeoutAsync(30000);
+                    // await StaffCheck.ClickAsync(new() { Timeout = 10000 });
+                    // await _page.WaitForTimeoutAsync(30000);
+
+                    await StaffCheck.ClickAsync();
+                    await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
+
                 }
                 // Ensure 'Run Report' button is visible before clicking
-                await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
-
-                if (await BtnRunReport.IsEnabledAsync())
+                // await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
+                if (await _page.Locator("//input[@value='Run Report']").IsVisibleAsync())
                 {
-                    await BtnRunReport.ClickAsync(new() { Timeout = 100000 });
-                    await _page.WaitForTimeoutAsync(100000);
-                    Console.WriteLine("Run Report button clicked.");
+                    // Go ahead and click
+                    await BtnRunReport.ClickAsync();
                 }
+
+                //if (await BtnRunReport.IsEnabledAsync())
+                //{
+                //    await BtnRunReport.ClickAsync(new() { Timeout = 100000 });
+                //    await _page.WaitForTimeoutAsync(100000);
+                //    Console.WriteLine("Run Report button clicked.");
+                //}
                 else
                 {
                     throw new Exception("Run Report button is disabled or not interactable.");
@@ -891,37 +900,49 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await Task.Delay(2000); // Explicit wait
             await ChkAlumniDisableduser.ClickAsync();
             await Task.Delay(5000); // Explicit wait
-            string note = "Testing";
+            //string note = "Testing";
             // Enter and clear note text
-            await TxtNote.WaitForAsync();
-            await TxtNote.FillAsync(note);
-            await TxtNote.ClearAsync();
+            //await TxtNote.WaitForAsync();
+            //await TxtNote.FillAsync(note);
+           // await TxtNote.ClearAsync();
             // Enter and clear reference text
-            await TxtReference.WaitForAsync();
-            await TxtReference.FillAsync(note);
+            //await TxtReference.WaitForAsync();
+           // await TxtReference.FillAsync(note);
             await TxtReference.ClearAsync();
-            // Get Yesterday's Date in "MM/dd/yyyy" format
-            DateTime yesterday = DateTime.Now.AddDays(-1);
+
+            // Get today's and yesterday's date
+            DateTime today = DateTime.Today;
+            DateTime yesterday = today.AddDays(-1);
             string startDate = yesterday.ToString("MM/dd/yyyy");
-            // Wait for the date field to be visible
-            await TxtStartDate.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-            // Click to open the date picker
+
+            // Open the calendar by clicking start date input
             await TxtStartDate.ClickAsync();
 
-            await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").ClearAsync();
-            //Change the date into prvious date daily
-            await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/06/2025");
+            // Ensure the calendar is showing the current month
+            string expectedMonth = today.ToString("MMMM yyyy");
+            var calendarHeader = _page.Locator("//div[contains(@class, 'datepicker-days')]//th[@class='datepicker-switch']");
 
-            /*
-            // Select the correct date from the current month in the calendar
-            await _page.Locator("//td[contains(@class, 'new') and contains(@class, 'day') and text()='1']").ClickAsync();
-            //await _page.Locator($"//td[contains(@class, 'day') and not(contains(@class, 'old')) and text()='{yesterday.Day}']").ClickAsync();
-            // Verify the date is set correctly
-            string enteredDate = await TxtStartDate.InputValueAsync();
-            if (enteredDate != startDate)
+            while ((await calendarHeader.InnerTextAsync()).Trim() != expectedMonth)
             {
-                throw new Exception($"Date selection failed! Expected: {startDate}, Found: {enteredDate}");
-            }*/
+                await _page.Locator("//div[contains(@class, 'datepicker-days')]//th[@class='next']").ClickAsync();
+                await Task.Delay(300);
+            }
+
+            // Now select yesterday's date cell (based on day number)
+          int yesterdayDay = yesterday.Day;
+            await _page.Locator($"//div[contains(@class, 'datepicker-days')]//td[contains(@class, 'day') and not(contains(@class,'old')) and not(contains(@class,'new')) and text()='{yesterdayDay}']").ClickAsync();
+            await Task.Delay(500);
+            await TxtStartDate.PressAsync("Tab");
+
+            // Optional: Log selected date
+            string selectedDate = await TxtStartDate.InputValueAsync();
+            Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
+
+
+
+            //Change the date into prvious date daily
+            //await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/08/2025");
+
             // Check if the school ledger has family or user drop-down
             bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
             if (isUser)
@@ -939,6 +960,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await SelectAll.ClickAsync();
             }
             // Click on the Ledger Filter button
+        
             await BtnLedgerFilter.WaitForAsync();
             await BtnLedgerFilter.ClickAsync();
             await Task.Delay(4000); // Wait for the table to load
@@ -1141,19 +1163,62 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await TabCustom.WaitForAsync();
             await TabCustom.ClickAsync();           
             DateTime today = DateTime.Now;
-            string endDate = today.ToString("MM/dd/yyyy");         
-            await TxtStartDate.WaitForAsync();
-            await TxtStartDate.FillAsync(DateFunction(startDate), new() { Force = true });
-           // await _page.EvaluateAsync("document.querySelector('#txtStartDate').value = arguments[0];", DateFunction(startDate));
+            string endDate = today.ToString("MM/dd/yyyy");
 
-            await Task.Delay(2000);
-            await TxtStartDate.PressAsync("Tab");
-            await TxtEndDate.WaitForAsync();
-            await TxtEndDate.FillAsync(DateFunction(endDate));
+
+            #region Method 1
+            //# Method 1 Works fine
+
+            // Parse the passed startDate string
+            DateTime dateToSelect = DateTime.ParseExact(startDate, "MM/dd/yyyy", CultureInfo.InvariantCulture);
+            int targetDay = dateToSelect.Day;
+            int targetMonth = dateToSelect.Month;
+            int targetYear = dateToSelect.Year;
+
+            // Open the calendar
+            await TxtStartDate.ClickAsync();
+
+            // Navigate calendar to correct month/year
+            while (true)
+            {
+                var displayedMonthYear = await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='datepicker-switch']").First.TextContentAsync();
+                DateTime displayedDate = DateTime.ParseExact(displayedMonthYear, "MMMM yyyy", CultureInfo.InvariantCulture);
+
+                if (displayedDate.Month == targetMonth && displayedDate.Year == targetYear)
+                    break;
+
+                if (displayedDate < dateToSelect)
+                {
+                    await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='next']").First.ClickAsync();
+                }
+                else
+                {
+                    await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='prev']").First.ClickAsync();
+                }
+
+                await Task.Delay(300); // wait briefly for calendar to update
+            }
+
+            // Click on the target day
+            await _page.Locator($"//div[contains(@class,'datepicker-days')]//td[contains(@class,'day') and not(contains(@class,'old')) and not(contains(@class,'new')) and text()='{targetDay}']").First.ClickAsync();
+
+            #endregion
+            // Wait for next element
+            await TxtEndDate.WaitForAsync(new() { Timeout = 30000 });
+
+            /*
+                        await TxtStartDate.WaitForAsync();
+                        await TxtStartDate.FillAsync(DateFunction(startDate), new() { Force = true });
+                       // await _page.EvaluateAsync("document.querySelector('#txtStartDate').value = arguments[0];", DateFunction(startDate));
+
+                        await Task.Delay(2000);
+                        await TxtStartDate.PressAsync("Tab");
+                        await TxtEndDate.WaitForAsync();
+                        await TxtEndDate.FillAsync(DateFunction(endDate));*/
             await TxtEndDate.PressAsync("Tab");
             await BtnCustomFilter.WaitForAsync();
             await BtnCustomFilter.ClickAsync();
-            await _page.WaitForTimeoutAsync(3000); // Instead of Thread.Sleep
+            await _page.WaitForTimeoutAsync(10000); // Instead of Thread.Sleep
             string CCTotAmt = "0";
             string eCheckTotAmt = "0";
             decimal TotalAmount = 0;
