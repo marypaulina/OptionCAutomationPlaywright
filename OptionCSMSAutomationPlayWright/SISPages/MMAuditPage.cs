@@ -361,11 +361,20 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }
                 // Ensure 'Run Report' button is visible before clicking
                 // await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
-                if (await _page.Locator("//input[@value='Run Report']").IsVisibleAsync())
+                //if (await _page.Locator("//input[@value='Run Report']").IsVisibleAsync())
+                //{
+                //    // Go ahead and click
+                //    await BtnRunReport.ClickAsync();
+                //}
+
+                var runReportLocator = _page.Locator("//input[@value='Run Report']");
+                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
+
+                if (await runReportLocator.IsVisibleAsync())
                 {
-                    // Go ahead and click
                     await BtnRunReport.ClickAsync();
                 }
+
 
                 //if (await BtnRunReport.IsEnabledAsync())
                 //{
