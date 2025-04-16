@@ -26,7 +26,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public string path = string.Empty;
 
         public MMAuditPages(IPage page, WaitHelper waitHelper) : base(page)
-        {         
+        {
             _page = page;
             _page.SetDefaultTimeout(100000);
             this.waitHelper = waitHelper;
@@ -286,7 +286,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await Task.Delay(1000);
             return (true, reportId);
         }
-        
+
         public async Task ChangePageLengthAsync()
         {
             // Wait for the dropdown to be available
@@ -710,7 +710,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Columns[17].Width = 10;
                 workSheet.Columns[18].Width = 10;
                 workSheet.Columns[19].Width = 63;
-                workSheet.Columns[20].Width = 65;             
+                workSheet.Columns[20].Width = 65;
+                workSheet.Columns[21].Width = 65;
+                workSheet.Columns[22].Width = 65;
                 int lastRow = tab + 2;
                 int headerRow = 1;
                 int dataStartRow = 2 + tab;
@@ -738,7 +740,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         "Total CC Acc. Created",
                         "Total eCheck Acc. Created",
                         "New/ InProgress Account",
-                        "Funding Amount vs Transaction Amount (902 & 905)"
+                        "Funding Amount vs Transaction Amount (902 & 905)",
+                        "Auto Withdrawal On Count", // New column for count
+                "Total Debit for Auto Withdrawal On" // New column for debit total
                     };
                     for (int i = 0; i < headers.Length; i++)
                     {
@@ -773,6 +777,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"R{lastRow}"].Value = ConvertToInt(objReport?.ECheckCount ?? "0");
                 workSheet.Cells[$"S{lastRow}"].Value = objReport?.AccountStatus;
                 workSheet.Cells[$"T{lastRow}"].Value = objReport?.CompareResults;
+
+                // Add new columns for Auto Withdrawal On count and debit total
+                workSheet.Cells[$"U{lastRow}"].Value = ledgerPayments?.AutoWithdrawalOnCount;
+                workSheet.Cells[$"V{lastRow}"].Value = ledgerPayments?.AutoWithdrawalOnCreditTotal;
                 // Apply Row Formatting
                 for (int col = 1; col <= workSheet.Dimension.Columns; col++)
                 {
@@ -790,7 +798,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     }
                 }
                 // Conditional Formatting for Comparison Results
-                workSheet.Cells[$"T{lastRow}"].Style.Font.Color.SetColor(
+                workSheet.Cells[$"V{lastRow}"].Style.Font.Color.SetColor(
                     objReport?.CompareResults?.Contains("are not equal") == true ? Color.Red : Color.Green);
                 // Summary Rows
                 workSheet.Cells[$"C{finalRow - 1}"].Value = "Sub Total: ";
@@ -816,10 +824,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"C{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
                 workSheet.Cells[$"D{finalRow}"].Formula = $"=F{finalRow - 1}";
                 // Formatting
-                workSheet.Cells[$"A1:T1"].Style.WrapText = true;
-                workSheet.Cells[$"R2:T{finalRow}"].Style.WrapText = true;
-                workSheet.Cells[$"A1:T{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
-                workSheet.Cells[$"A1:T{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
+                workSheet.Cells[$"A1:V1"].Style.WrapText = true;
+                workSheet.Cells[$"R2:V{finalRow}"].Style.WrapText = true;
+                workSheet.Cells[$"A1:V{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                workSheet.Cells[$"A1:V{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                 workSheet.View.ShowGridLines = false;
                 // Applying Borders
                 using (ExcelRange range = workSheet.Cells[$"A1:T{finalRow}"])
@@ -904,20 +912,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task<LedgerPayments> GetChargesPaymentsAsync()
         {
             LedgerPayments ledgerPayments = new LedgerPayments();
+
             // Wait for the alumni disabled user checkbox and click it
             await ChkAlumniDisableduser.WaitForAsync();
             await Task.Delay(2000); // Explicit wait
             await ChkAlumniDisableduser.ClickAsync();
             await Task.Delay(5000); // Explicit wait
-            //string note = "Testing";
-            // Enter and clear note text
-            //await TxtNote.WaitForAsync();
-            //await TxtNote.FillAsync(note);
-           // await TxtNote.ClearAsync();
-            // Enter and clear reference text
-            //await TxtReference.WaitForAsync();
-           // await TxtReference.FillAsync(note);
-            await TxtReference.ClearAsync();
 
             // Get today's and yesterday's date
             DateTime today = DateTime.Today;
@@ -938,7 +938,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
 
             // Now select yesterday's date cell (based on day number)
-          int yesterdayDay = yesterday.Day;
+            int yesterdayDay = yesterday.Day;
             await _page.Locator($"//div[contains(@class, 'datepicker-days')]//td[contains(@class, 'day') and not(contains(@class,'old')) and not(contains(@class,'new')) and text()='{yesterdayDay}']").ClickAsync();
             await Task.Delay(500);
             await TxtStartDate.PressAsync("Tab");
@@ -946,11 +946,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Optional: Log selected date
             string selectedDate = await TxtStartDate.InputValueAsync();
             Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
-
-
-
-            //Change the date into prvious date daily
-            //await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/08/2025");
 
             // Check if the school ledger has family or user drop-down
             bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
@@ -968,11 +963,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await SelectAll.WaitForAsync();
                 await SelectAll.ClickAsync();
             }
+
             // Click on the Ledger Filter button
-        
             await BtnLedgerFilter.WaitForAsync();
             await BtnLedgerFilter.ClickAsync();
             await Task.Delay(4000); // Wait for the table to load
+
             // Wait for the ledger table to be present
             var ledgerTable = await _page.Locator("#tblLedger").IsVisibleAsync();
             if (!ledgerTable)
@@ -980,9 +976,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 Console.WriteLine("Ledger table not found.");
                 return ledgerPayments;
             }
-            var rows = await _page.Locator("#tblLedger tr").CountAsync();
+
+            // Get the count of rows in the table
+            var rowCount = await _page.Locator("#tblLedger tr").CountAsync();
             string getDebit = "0";
-            if (rows > 2)
+            if (rowCount > 2)
             {
                 // Get the total charges and payments
                 string getCredit = await LblTotalCredit.InnerTextAsync() ?? "0";
@@ -1004,9 +1002,48 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     $"School Ledger: No Charges or Payments posted for today ({startDate})\n");
             }
 
+            // Find rows in the ledger table where the status is "Auto Withdrawal On"
+            int autoWithdrawalOnCount = 0;
+            decimal autoWithdrawalOnCreditTotal = 0;
+
+            // Iterate through each row
+            for (int i = 0; i < rowCount; i++)
+            {
+                // Get the current row
+                var row = _page.Locator("#tblLedger tr").Nth(i);
+
+                // Check if the row contains the "Auto Withdrawal On" status
+                var statusElement = row.Locator("span[title='Auto Withdrawal']");
+
+                if (await statusElement.IsVisibleAsync())
+                {
+                    // Find the Debit value in this row (assuming it's in the 7th column)
+                    var creditValueText = await row.Locator("td:nth-child(6)").TextContentAsync();
+                    if (decimal.TryParse(creditValueText.Trim('$'), out decimal creditValue))
+                    {
+                        autoWithdrawalOnCreditTotal += creditValue;
+                        autoWithdrawalOnCount++;
+                    }
+                }
+            }
+
+            // Assign values to the LedgerPayments object for later use (e.g., Excel report generation)
+            ledgerPayments.AutoWithdrawalOnCount = autoWithdrawalOnCount;
+            ledgerPayments.AutoWithdrawalOnCreditTotal = autoWithdrawalOnCreditTotal;
+
+            // Proceed with the existing logic for ledgerPayments...
             ledgerPayments = await TodaysMMPaymentsAsync(getDebit);
             return ledgerPayments;
         }
+
+
+
+
+
+
+
+
+
         #endregion
 
         #region Some Public common methods
@@ -1145,7 +1182,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     totalMMPayment =
                         (string.IsNullOrEmpty(ccAmount) ? 0 : Convert.ToDecimal(ccAmount.Replace("$", ""))) +
                         (string.IsNullOrEmpty(eCheckAmount) ? 0 : Convert.ToDecimal(eCheckAmount.Replace("$", "")));
-                }             
+                }
             }
             using (StreamWriter writer = new StreamWriter(path, true))
             {
@@ -1170,7 +1207,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             //await _page.Locator("#tabMMDashboard").ClickAsync();
             await TabMMDashboard.ClickAsync();
             await TabCustom.WaitForAsync();
-            await TabCustom.ClickAsync();           
+            await TabCustom.ClickAsync();
             DateTime today = DateTime.Now;
             string endDate = today.ToString("MM/dd/yyyy");
 
@@ -1234,7 +1271,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await _page.EvaluateAsync("window.scrollBy(0, document.body.scrollHeight);");
             try
             {
-                var lblCCAmount = await LblCCAmount.InnerTextAsync();           
+                var lblCCAmount = await LblCCAmount.InnerTextAsync();
                 var lblCCCount = await LblCCCount.InnerTextAsync();
                 var lbleCheckAmount = await LbleCheckAmount.InnerTextAsync();
                 var lbleCheckCount = await LbleCheckCount.InnerTextAsync();

@@ -58,5 +58,8 @@
         public string eCheckPayment { get; set; } = string.Empty;
         public string TotalPayment { get; set; } = string.Empty;
         public string TotalCharges { get; set; } = string.Empty;
+
+        public int AutoWithdrawalOnCount { get; set; }
+        public decimal AutoWithdrawalOnCreditTotal { get; set; }
     }
 }
