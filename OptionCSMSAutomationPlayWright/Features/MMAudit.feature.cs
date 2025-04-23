@@ -122,24 +122,6 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
-                            "8990",
-                            "08/18/2024"});
-                table2.AddRow(new string[] {
-                            "142",
-                            "09/10/2024"});
-                table2.AddRow(new string[] {
-                            "7296",
-                            "09/17/2024"});
-                table2.AddRow(new string[] {
-                            "8507",
-                            "06/21/2024"});
-                table2.AddRow(new string[] {
-                            "7303",
-                            "06/30/2024"});
-                table2.AddRow(new string[] {
-                            "8465",
-                            "07/17/2024"});
-                table2.AddRow(new string[] {
                             "8351",
                             "07/11/2024"});
                 table2.AddRow(new string[] {
@@ -166,6 +148,24 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "8545",
                             "08/19/2024"});
+                table2.AddRow(new string[] {
+                            "8990",
+                            "08/18/2024"});
+                table2.AddRow(new string[] {
+                            "142",
+                            "09/10/2024"});
+                table2.AddRow(new string[] {
+                            "7296",
+                            "09/17/2024"});
+                table2.AddRow(new string[] {
+                            "8507",
+                            "06/21/2024"});
+                table2.AddRow(new string[] {
+                            "7303",
+                            "06/30/2024"});
+                table2.AddRow(new string[] {
+                            "8465",
+                            "07/17/2024"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden
