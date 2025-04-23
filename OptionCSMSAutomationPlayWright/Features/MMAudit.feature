@@ -9,10 +9,7 @@ Scenario: 001_To generate the Daily MM audit report for all the MM schools and c
 	| URL                         | Username             | Password  |
 	| https://acutis.optionc.com/ | jclement@optionc.com | viper@123 |
 	And Open all the MM schools and audit the fee details everyday
-	| SchoolCode                            | StartDate  |										
-	| 7304                                  | 06/10/2024 |
-	| 5158                                  | 06/18/2024 |
-	| 8518                                  | 06/20/2024 |
+	| SchoolCode                            | StartDate  |											
 	| 221                                   | 08/15/2024 |
 	| 7301 St. Bridget School - River Falls | 07/23/2024 |
 	| 8232                                  | 08/21/2024 |
@@ -26,6 +23,9 @@ Scenario: 001_To generate the Daily MM audit report for all the MM schools and c
 	| 8298                                  | 02/19/2025 |
 	| 7291                                  | 07/01/2024 |
 	| 8417                                  | 05/15/2024 |
+	| 7304                                  | 06/10/2024 |
+	| 5158                                  | 06/18/2024 |
+	| 8518                                  | 06/20/2024 |
 
 	#| 4291                                  | 02/19/2025 |
 	#| 3340                                  | 08/27/2024 |
