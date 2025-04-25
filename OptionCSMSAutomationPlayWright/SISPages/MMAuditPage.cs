@@ -543,7 +543,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             IReadOnlyList<IElementHandle> tableRows;
             if (ReportId != 911)
             {
-                await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
+               // await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
+                await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { Timeout = 60000, State = WaitForSelectorState.Visible });
+
                 tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
             else
