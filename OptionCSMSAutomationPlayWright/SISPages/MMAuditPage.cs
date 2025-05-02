@@ -1167,7 +1167,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             DashboardAmount dashboardAmount = new DashboardAmount();
             await Task.Delay(2000);
             //await _page.Locator("#tabMMDashboard").WaitForAsync();
-            await TabMMDashboard.WaitForAsync();
+            await TabMMDashboard.WaitForAsync(new() { Timeout = 60000 });
             await _page.EvaluateAsync("window.scrollTo(0,0);");
             //await _page.Locator("#tabMMDashboard").ClickAsync();
             await TabMMDashboard.ClickAsync();
