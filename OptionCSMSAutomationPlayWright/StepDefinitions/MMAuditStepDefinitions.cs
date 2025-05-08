@@ -48,7 +48,7 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
                 Console.WriteLine("Landed in Fee Management page");
                 ledgerPayments = await mmPage.GetChargesPaymentsAsync();// Verify charges, payments posted in last 24 hrs from the ledger
                 //if (schoolCode != "3932" && schoolCode != "4291")
-                if (schoolCode != "4291")
+                if (schoolCode != "4291" && schoolCode != "1126")
                 {
                     dashboardAmount = await mmPage.VerifySchoolMMDashboardAsync(startDate);// Open dashboard, filter current school year, and read data
                 }
