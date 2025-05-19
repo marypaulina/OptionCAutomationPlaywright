@@ -148,6 +148,24 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "7285",
                             "08/28/2024"});
+                table2.AddRow(new string[] {
+                            "6929",
+                            "07/26/2024"});
+                table2.AddRow(new string[] {
+                            "8407",
+                            "08/20/2024"});
+                table2.AddRow(new string[] {
+                            "8958",
+                            "08/27/2024"});
+                table2.AddRow(new string[] {
+                            "6904",
+                            "08/16/2024"});
+                table2.AddRow(new string[] {
+                            "8298",
+                            "02/19/2025"});
+                table2.AddRow(new string[] {
+                            "7291",
+                            "07/01/2024"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden
