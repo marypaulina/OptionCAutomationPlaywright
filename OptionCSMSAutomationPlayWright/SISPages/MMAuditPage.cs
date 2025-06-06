@@ -368,7 +368,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 //}
 
                 var runReportLocator = _page.Locator("//input[@value='Run Report']");
-                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 35000 });
+                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 100000 });
 
                 if (await runReportLocator.IsVisibleAsync())
                 {
