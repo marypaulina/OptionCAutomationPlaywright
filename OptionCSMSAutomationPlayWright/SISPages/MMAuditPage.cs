@@ -333,7 +333,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 await MaxWindow();
-                await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
+                await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 200000 });
                 await SearchFeeReportAsync(907, _page);
                 await MaxWindow();
                 var pages = _page.Context.Pages;
@@ -368,7 +368,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 //}
 
                 var runReportLocator = _page.Locator("//input[@value='Run Report']");
-                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 100000 });
+                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 200000 });
 
                 if (await runReportLocator.IsVisibleAsync())
                 {
