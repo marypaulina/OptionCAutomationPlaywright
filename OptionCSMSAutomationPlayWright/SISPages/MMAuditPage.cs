@@ -690,8 +690,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             using (ExcelPackage package = new ExcelPackage(new FileInfo(filePath)))
             {
-                ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2024-2025")
-                                              ?? package.Workbook.Worksheets.Add("2024-2025");
+                ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2025-2026")
+                                              ?? package.Workbook.Worksheets.Add("2025-2026");
                 // Set the column widths manually
                 workSheet.Columns[1].Width = 3;
                 workSheet.Columns[2].Width = 35;
