@@ -525,7 +525,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             // Start date filtering
             await TransStartDateFilter.ClickAsync();
-            await TransStartDateFilter.FillAsync(DateFunction("01/01/2020"));
+            await TransStartDateFilter.FillAsync(DateFunction("01/01/2020")); //Day 1 mm released date
             // Click appropriate filter button
             if (ReportId != 911)
             {
