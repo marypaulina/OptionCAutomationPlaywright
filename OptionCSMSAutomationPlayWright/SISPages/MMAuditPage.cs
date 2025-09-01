@@ -368,7 +368,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 //}
 
                 var runReportLocator = _page.Locator("//input[@value='Run Report']");
-                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 200000 });
+                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 });
 
                 if (await runReportLocator.IsVisibleAsync())
                 {
@@ -900,7 +900,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             return date; // Modify if needed
         }
         #endregion
-
+        
         #region Get Charges and Payments from the Fee Management Ledger
         // To find the total charges and payments posted for the given date range in School Ledger
         public async Task<LedgerPayments> GetChargesPaymentsAsync()
@@ -921,6 +921,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
            // await TxtReference.FillAsync(note);
             await TxtReference.ClearAsync();
 
+            /*
             // Get today's and yesterday's date
             DateTime today = DateTime.Today;
             DateTime yesterday = today.AddDays(-1);
@@ -953,6 +954,65 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             //Change the date into prvious date daily
             //await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/08/2025");
+            */
+
+
+
+
+            // Get today's and yesterday's date
+            DateTime today = DateTime.Today;
+            DateTime yesterday = today.AddDays(-1);
+            string startDate = yesterday.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+
+            // Open the calendar by clicking start date input
+            await TxtStartDate.ClickAsync();
+
+            // Grab the visible calendar
+            var dpRoot = _page.Locator("div.datepicker-days:visible");
+            await dpRoot.WaitForAsync();
+
+            // Controls within that calendar
+            var header = dpRoot.Locator("th.datepicker-switch");
+            var prevBtn = dpRoot.Locator("th.prev");
+            var nextBtn = dpRoot.Locator("th.next");
+
+            // Navigate to the month that contains 'yesterday'
+            var targetMonth = new DateTime(yesterday.Year, yesterday.Month, 1);
+            int guard = 0;
+            while (true)
+            {
+                string headerText = (await header.InnerTextAsync()).Trim();      // e.g., "September 2025"
+                var shownMonth = DateTime.ParseExact(headerText, "MMMM yyyy", CultureInfo.InvariantCulture);
+
+                if (shownMonth.Year == targetMonth.Year && shownMonth.Month == targetMonth.Month)
+                    break;
+
+                if (shownMonth > targetMonth)
+                    await prevBtn.ClickAsync();
+                else
+                    await nextBtn.ClickAsync();
+
+                // small, reliable wait for the header to update
+                await header.WaitForAsync();
+                if (++guard > 24) throw new Exception("Could not navigate datepicker to the target month.");
+            }
+
+            // Select yesterday’s day cell inside the shown month (exclude old/new spillover)
+            int yesterdayDay = yesterday.Day;
+            var dayCell = dpRoot.Locator($@"td.day:not(.old):not(.new):text-is(""{yesterdayDay}"")");
+
+            // Fallback: if some themes don’t use old/new classes, just avoid disabled days
+            if (await dayCell.CountAsync() == 0)
+                dayCell = dpRoot.Locator($@"td.day:not(.disabled):text-is(""{yesterdayDay}"")");
+
+            await dayCell.First.ClickAsync();
+            await TxtStartDate.PressAsync("Tab");
+
+            // Optional: verify
+            string selectedDate = await TxtStartDate.InputValueAsync();
+            Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
+
+
 
             // Check if the school ledger has family or user drop-down
             bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
@@ -1010,7 +1070,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             return ledgerPayments;
         }
         #endregion
-
+      
         #region Some Public common methods
         // Method to verify whether an element is present in the ledger table
         public static async Task<bool> IsElementPresentInLedger(IPage page, string selector)
