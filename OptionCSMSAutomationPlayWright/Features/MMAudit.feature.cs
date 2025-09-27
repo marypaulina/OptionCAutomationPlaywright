@@ -122,21 +122,6 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
-                            "16000",
-                            "05/06/2025"});
-                table2.AddRow(new string[] {
-                            "6929",
-                            "08/05/2025"});
-                table2.AddRow(new string[] {
-                            "6904",
-                            "08/05/2025"});
-                table2.AddRow(new string[] {
-                            "7291",
-                            "07/02/2025"});
-                table2.AddRow(new string[] {
-                            "8417",
-                            "05/24/2025"});
-                table2.AddRow(new string[] {
                             "7304",
                             "05/28/2025"});
                 table2.AddRow(new string[] {
@@ -154,6 +139,21 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "8232",
                             "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "16000",
+                            "05/06/2025"});
+                table2.AddRow(new string[] {
+                            "6929",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "6904",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "7291",
+                            "07/02/2025"});
+                table2.AddRow(new string[] {
+                            "8417",
+                            "05/24/2025"});
                 table2.AddRow(new string[] {
                             "7292",
                             "08/05/2025"});
