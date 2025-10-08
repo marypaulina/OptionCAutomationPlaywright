@@ -9,6 +9,7 @@ using Page = DocumentFormat.OpenXml.Spreadsheet.Page;
 using Path = System.IO.Path;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
+using OfficeOpenXml;
 using System.IO;
 using static OptionCSMSAutomationPlayWright.SISPages.BasePageObject;
 using OpenQA.Selenium;
@@ -524,9 +525,24 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }
             }
             // Start date filtering
+            //await TransStartDateFilter.ClickAsync();
+            //await TransStartDateFilter.FillAsync(DateFunction("01/01/2020")); //Day 1 mm released date
+            // Click inside the Start Date field
             await TransStartDateFilter.ClickAsync();
-            await TransStartDateFilter.FillAsync(DateFunction("01/01/2020")); //Day 1 mm released date
-            // Click appropriate filter button
+
+            // Clear any existing value
+            await TransStartDateFilter.PressAsync("Control+A"); // Select all
+            await TransStartDateFilter.PressAsync("Backspace"); // Delete existing text
+
+            // Type the required date manually
+            await TransStartDateFilter.TypeAsync(text: "01/01/2020");
+
+            // Trigger blur/change event by tabbing out
+            await TransStartDateFilter.PressAsync("Tab");
+
+
+
+
             if (ReportId != 911)
             {
                 //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
@@ -1089,6 +1105,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         //Write all the values in the excel file for Acutis MM Dashboard
         public async Task WriteAcutisDashboardValuesinExcelAsync(ACutisDashboardAmount acutisDashboardAmt = null, int tab = 0) //tab = row count
         {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             int lastRow = tab + 2;
             //workSheet[$"A{lastRow}"].Value = "";
             await Task.CompletedTask;
