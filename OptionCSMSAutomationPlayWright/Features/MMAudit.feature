@@ -9,7 +9,7 @@ Scenario: 001_To generate the Daily MM audit report for all the MM schools and c
 	| URL                         | Username             | Password  |
 	| https://acutis.optionc.com/ | jclement@optionc.com | viper@123 |
 	And Open all the MM schools and audit the fee details everyday
-	| SchoolCode                            | StartDate  |	
+	| SchoolCode                            | StartDate  |
 	| 7304                                  | 05/28/2025 |
 	| 5158                                  | 06/28/2025 |
 	| 8518                                  | 08/05/2025 |
