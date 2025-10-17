@@ -122,30 +122,6 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
-                            "8958",
-                            "06/30/2025"});
-                table2.AddRow(new string[] {
-                            "8298",
-                            "06/09/2025"});
-                table2.AddRow(new string[] {
-                            "7304",
-                            "05/28/2025"});
-                table2.AddRow(new string[] {
-                            "5158",
-                            "06/28/2025"});
-                table2.AddRow(new string[] {
-                            "8518",
-                            "08/05/2025"});
-                table2.AddRow(new string[] {
-                            "221",
-                            "08/15/2025"});
-                table2.AddRow(new string[] {
-                            "7301 St. Bridget School - River Falls",
-                            "06/26/2025"});
-                table2.AddRow(new string[] {
-                            "8232",
-                            "08/05/2025"});
-                table2.AddRow(new string[] {
                             "16000",
                             "05/06/2025"});
                 table2.AddRow(new string[] {
@@ -172,6 +148,30 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "8235",
                             "08/14/2025"});
+                table2.AddRow(new string[] {
+                            "8958",
+                            "06/30/2025"});
+                table2.AddRow(new string[] {
+                            "8298",
+                            "06/09/2025"});
+                table2.AddRow(new string[] {
+                            "7304",
+                            "05/28/2025"});
+                table2.AddRow(new string[] {
+                            "5158",
+                            "06/28/2025"});
+                table2.AddRow(new string[] {
+                            "8518",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "221",
+                            "08/15/2025"});
+                table2.AddRow(new string[] {
+                            "7301 St. Bridget School - River Falls",
+                            "06/26/2025"});
+                table2.AddRow(new string[] {
+                            "8232",
+                            "08/05/2025"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden
