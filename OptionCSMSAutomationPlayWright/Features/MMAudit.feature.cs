@@ -122,18 +122,6 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
-                            "16000",
-                            "05/06/2025"});
-                table2.AddRow(new string[] {
-                            "6929",
-                            "08/05/2025"});
-                table2.AddRow(new string[] {
-                            "6904",
-                            "08/05/2025"});
-                table2.AddRow(new string[] {
-                            "7291",
-                            "07/02/2025"});
-                table2.AddRow(new string[] {
                             "8417",
                             "05/24/2025"});
                 table2.AddRow(new string[] {
@@ -143,11 +131,11 @@ this.ScenarioInitialize(scenarioInfo);
                             "7285",
                             "06/26/2025"});
                 table2.AddRow(new string[] {
-                            "8407",
-                            "08/05/2025"});
+                            "5940",
+                            "08/13/2025"});
                 table2.AddRow(new string[] {
-                            "8235",
-                            "08/14/2025"});
+                            "8308",
+                            "09/30/2025"});
                 table2.AddRow(new string[] {
                             "8958",
                             "06/30/2025"});
@@ -167,11 +155,74 @@ this.ScenarioInitialize(scenarioInfo);
                             "221",
                             "08/15/2025"});
                 table2.AddRow(new string[] {
-                            "7301 St. Bridget School - River Falls",
+                            "St. Bridget School - River Falls",
                             "06/26/2025"});
                 table2.AddRow(new string[] {
                             "8232",
                             "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "16000",
+                            "05/06/2025"});
+                table2.AddRow(new string[] {
+                            "6929",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "6904",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "7291",
+                            "07/02/2025"});
+                table2.AddRow(new string[] {
+                            "4291",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "142",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "7296",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "8235",
+                            "08/14/2025"});
+                table2.AddRow(new string[] {
+                            "8407",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "3340",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "8351",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "6142",
+                            "06/25/2025"});
+                table2.AddRow(new string[] {
+                            "1126",
+                            "08/05/2025"});
+                table2.AddRow(new string[] {
+                            "3932",
+                            "07/15/2025"});
+                table2.AddRow(new string[] {
+                            "8763",
+                            "06/26/2025"});
+                table2.AddRow(new string[] {
+                            "7128",
+                            "06/17/2025"});
+                table2.AddRow(new string[] {
+                            "8400",
+                            "06/01/2025"});
+                table2.AddRow(new string[] {
+                            "8545",
+                            "07/28/2025"});
+                table2.AddRow(new string[] {
+                            "8990",
+                            "07/22/2025"});
+                table2.AddRow(new string[] {
+                            "8507",
+                            "06/10/2025"});
+                table2.AddRow(new string[] {
+                            "7303",
+                            "06/30/2025"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden

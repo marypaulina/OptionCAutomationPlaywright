@@ -165,7 +165,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             var waitForNewPage = _page.Context.WaitForPageAsync(); // Prepare to wait for the new page before clicking
 
-            await IconNextGen.First.ClickAsync(new() { Timeout = 20000 }); // Click the NextGen icon (which opens a new tab)
+            await IconNextGen.First.ClickAsync(new() { Timeout = 30000 }); // Click the NextGen icon (which opens a new tab)
 
             var newPage = await waitForNewPage; // Wait for the new page to be created
 
@@ -552,15 +552,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             else
             {
                 await Btn911Filter.ClickAsync(new() { Timeout = 300000 }); // Click with timeout
-                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 60000 }); // Wait until network requests complete
-                await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60000 }); // Wait until the table is visible
+                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 300000 }); // Wait until network requests complete
+                await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 }); // Wait until the table is visible
             }
             // Wait for the table to load
             IReadOnlyList<IElementHandle> tableRows;
             if (ReportId != 911)
             {
                // await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
-                await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { Timeout = 60000, State = WaitForSelectorState.Visible });
+                await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { Timeout = 300000, State = WaitForSelectorState.Visible });
 
                 tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
@@ -927,54 +927,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await Task.Delay(2000); // Explicit wait
             await ChkAlumniDisableduser.ClickAsync();
             await Task.Delay(5000); // Explicit wait
-            //string note = "Testing";
-            // Enter and clear note text
-            //await TxtNote.WaitForAsync();
-            //await TxtNote.FillAsync(note);
-           // await TxtNote.ClearAsync();
-            // Enter and clear reference text
-            //await TxtReference.WaitForAsync();
-           // await TxtReference.FillAsync(note);
             await TxtReference.ClearAsync();
-
-            /*
-            // Get today's and yesterday's date
-            DateTime today = DateTime.Today;
-            DateTime yesterday = today.AddDays(-1);
-            string startDate = yesterday.ToString("MM/dd/yyyy");
-
-            // Open the calendar by clicking start date input
-            await TxtStartDate.ClickAsync();
-
-            // Ensure the calendar is showing the current month
-            string expectedMonth = today.ToString("MMMM yyyy");
-            var calendarHeader = _page.Locator("//div[contains(@class, 'datepicker-days')]//th[@class='datepicker-switch']");
-
-            while ((await calendarHeader.InnerTextAsync()).Trim() != expectedMonth)
-            {
-                await _page.Locator("//div[contains(@class, 'datepicker-days')]//th[@class='next']").ClickAsync();
-                await Task.Delay(300);
-            }
-
-            // Now select yesterday's date cell (based on day number)
-          int yesterdayDay = yesterday.Day;
-            await _page.Locator($"//div[contains(@class, 'datepicker-days')]//td[contains(@class, 'day') and not(contains(@class,'old')) and not(contains(@class,'new')) and text()='{yesterdayDay}']").ClickAsync();
-            await Task.Delay(500);
-            await TxtStartDate.PressAsync("Tab");
-
-            // Optional: Log selected date
-            string selectedDate = await TxtStartDate.InputValueAsync();
-            Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
-
-
-
-            //Change the date into prvious date daily
-            //await _page.Locator($"#{EnumCommandAcutis.ControlId.txtStartDate}").FillAsync("04/08/2025");
-            */
-
-
-
-
             // Get today's and yesterday's date
             DateTime today = DateTime.Today;
             DateTime yesterday = today.AddDays(-1);
@@ -985,7 +938,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             // Grab the visible calendar
             var dpRoot = _page.Locator("div.datepicker-days:visible");
-            await dpRoot.WaitForAsync();
+            //await dpRoot.WaitForAsync();
+            await dpRoot.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 });
 
             // Controls within that calendar
             var header = dpRoot.Locator("th.datepicker-switch");
@@ -1048,7 +1002,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             // Click on the Ledger Filter button
         
-            await BtnLedgerFilter.WaitForAsync();
+            await BtnLedgerFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 });
+           
             await BtnLedgerFilter.ClickAsync();
             await Task.Delay(4000); // Wait for the table to load
             // Wait for the ledger table to be present
@@ -1244,7 +1199,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             DashboardAmount dashboardAmount = new DashboardAmount();
             await Task.Delay(2000);
             //await _page.Locator("#tabMMDashboard").WaitForAsync();
-            await TabMMDashboard.WaitForAsync(new() { Timeout = 60000 });
+            await TabMMDashboard.WaitForAsync(new() { Timeout = 100000 });
             await _page.EvaluateAsync("window.scrollTo(0,0);");
             //await _page.Locator("#tabMMDashboard").ClickAsync();
             await TabMMDashboard.ClickAsync();
