@@ -114,6 +114,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         // Logout Elements
         public ILocator LinkSignout => _page.Locator("//a[@class='dropdown-item signout']");
 
+        //Survey Popup
+        // Popup root
+        private ILocator SurveyPopup => _page.Locator("//div[contains(@class,'modal-content') and contains(@class,'survey-modal-content')]");
+
+        // X (Remind me later) button
+        private ILocator SurveyCloseButton => _page.Locator("//a[contains(@class,'md-close') and @data-dismiss='modal']");
+
         /* Timeout Methods
          * (new() { Timeout = 60000 });
         await _page.GotoAsync(URL, new() { Timeout = 100000 });
@@ -194,13 +201,66 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Navigate to the Acutis school details page
         }
 
-        public async Task<bool> VerifyAdminDashboardAsync()
+        /// <summary>
+        /// Closes survey popup if it is displayed.
+        /// Does nothing if popup is not present.
+        /// </summary>
+        public async Task CloseSurveyPopupIfPresentAsync()
         {
             try
             {
+                if (await SurveyPopup.IsVisibleAsync(new LocatorIsVisibleOptions { Timeout = 2000 }))
+                {
+                    await SurveyCloseButton.ClickAsync();
+                }
+            }
+            catch (PlaywrightException)
+            {
+                // Popup not present – safely ignore
+            }
+        }
+
+
+        //public async Task<bool> VerifyAdminDashboardAsync()
+        //    {
+        //        try
+        //        {
+        //            // Wait for the admin dashboard section to be visible
+        //            var dashboardLocator = _page.Locator("//*[@id='sec-slider']/div");
+        //            await dashboardLocator.WaitForAsync();
+        //            // Check if the admin dashboard element is enabled
+        //            bool isDashboardEnabled = await AdminDashboard.IsEnabledAsync();
+        //            if (!isDashboardEnabled)
+        //            {
+        //                Console.WriteLine("Admin Dashboard is NOT enabled.");
+        //                return false;
+        //            }
+        //            Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
+        //            await SchoolName.WaitForAsync(); // Wait for the school name element to be present          
+        //            string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";// Get and trim the school name text
+        //            // Ensure the log file directory exists
+        //            if (!Directory.Exists(directoryPath))
+        //            {
+        //                Directory.CreateDirectory(directoryPath);
+        //            }
+        //            await File.AppendAllTextAsync(path, $"School Name: {getSchoolName}\n");// Append the school name to the audit log file
+        //            return true;
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            Console.WriteLine($"Error in VerifyAdminDashboardAsync: {ex.Message}");
+        //            return false;
+        //        }
+        //    }
+
+        public async Task<bool> VerifyAdminDashboardAsync()
+        {
+            try
+            {             
                 // Wait for the admin dashboard section to be visible
                 var dashboardLocator = _page.Locator("//*[@id='sec-slider']/div");
-                await dashboardLocator.WaitForAsync();
+                await dashboardLocator.WaitForAsync();           
+
                 // Check if the admin dashboard element is enabled
                 bool isDashboardEnabled = await AdminDashboard.IsEnabledAsync();
                 if (!isDashboardEnabled)
@@ -208,15 +268,46 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     Console.WriteLine("Admin Dashboard is NOT enabled.");
                     return false;
                 }
+
                 Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
-                await SchoolName.WaitForAsync(); // Wait for the school name element to be present          
-                string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";// Get and trim the school name text
-                // Ensure the log file directory exists
+                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+                // 🔹 Try to close survey popup if it appears
+                try
+                {
+                    bool isSurveyPopupVisible = await SurveyPopup
+                        .IsVisibleAsync(new LocatorIsVisibleOptions { Timeout = 3000 });
+
+                    if (isSurveyPopupVisible)
+                    {
+                        Console.WriteLine("Survey popup appeared. Closing it.");
+                        await SurveyCloseButton.ClickAsync();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Survey popup did not appear. Proceeding further.");
+                    }
+                }
+                catch
+                {
+                    // Absolutely safe fallback — continue execution
+                    Console.WriteLine("Survey popup check skipped. Proceeding further.");
+                }
+
+                // Wait for school name
+                await SchoolName.WaitForAsync();
+                string getSchoolName =
+                    (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";
+
+                // Ensure log directory exists
                 if (!Directory.Exists(directoryPath))
                 {
                     Directory.CreateDirectory(directoryPath);
                 }
-                await File.AppendAllTextAsync(path, $"School Name: {getSchoolName}\n");// Append the school name to the audit log file
+
+                // Log school name
+                await File.AppendAllTextAsync(path, $"School Name: {getSchoolName}\n");
+
                 return true;
             }
             catch (Exception ex)
@@ -226,11 +317,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
         }
 
+
         // This method navigates to the Fee Management section
         public async Task NavigateToFeeManagementAsync()
         {
             // Wait for the Administration menu to be visible and click it
             //await AdministrationMenu.First.WaitForAsync();
+            await _page.WaitForTimeoutAsync(5000);
             await AdministrationMenu.First.ClickAsync(new() { Timeout = 100000 });
 
             // Wait for the Fee Management menu to be visible and click it
@@ -334,7 +427,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 await MaxWindow();
-                await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 200000 });
+                await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
                 await SearchFeeReportAsync(907, _page);
                 await MaxWindow();
                 var pages = _page.Context.Pages;
@@ -369,7 +462,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 //}
 
                 var runReportLocator = _page.Locator("//input[@value='Run Report']");
-                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 });
+                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 100000 });
 
                 if (await runReportLocator.IsVisibleAsync())
                 {
