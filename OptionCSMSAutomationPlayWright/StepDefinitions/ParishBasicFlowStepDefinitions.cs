@@ -33,10 +33,15 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
         [Given(@"I Verify whether all the parish dasboard elements are displayed for the parish admin user")]
         public async Task GivenIVerifyWhetherAllTheParishDasboardElementsAreDisplayedForTheParishAdminUser()
         {
+            await parishPage.OpenTestParish();
+            await parishPage.MaxWindow();
             await parishPage.VerifyAndGetParishInstructionsTextAsync();
             await parishPage.VerifySaintOfTheDaySectionAsync();
             await parishPage.VerifyDailyReadingsOfTheDaySectionAsync();
             await parishPage.VerifyEventsAtDashboardAsync();
+            await parishPage.VerifyTaskListSectionAsync();
+            await parishPage.VerifyAnnouncementsAtDashboardAsync();
+            await parishPage.VerifyNewMessagesAtDashboardAsync();
 
         }
 

@@ -111,11 +111,11 @@ this.ScenarioInitialize(scenarioInfo);
                             "Username",
                             "Password"});
                 table3.AddRow(new string[] {
-                            "https://parish-signin.optionc.com/",
-                            "codyegner22@nomail.com",
-                            "Pass@123"});
+                            "https://parish-acutis.optionc.com/",
+                            "jclement@optionc.com",
+                            "password"});
 #line 6
- testRunner.Given("Parish Admin user has succesfully launched", ((string)(null)), table3, "Given ");
+ testRunner.Given("I sign in using Parish Acutis user credentials", ((string)(null)), table3, "Given ");
 #line hidden
 #line 9
  testRunner.And("I Verify whether all the parish dasboard elements are displayed for the parish ad" +

@@ -71,6 +71,43 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         private ILocator TicketRows => _page.Locator("//table[@id='ticketTable']//tbody//tr");
         private ILocator SubmittedDateCells => _page.Locator("//table[@id='ticketTable']//tbody//tr//td[3]");
 
+        public ILocator LnkParishes => _page.Locator("(//a[@id='liSchool'])[1]");
+        public ILocator TxtSearch => _page.Locator("//input[@type='search' and @aria-controls='example']");
+        public ILocator BtnNextGen => _page.Locator("//a[normalize-space()='N']");
+
+        // ================= Events Section Locators =================
+
+        public ILocator EventsHeader =>
+            _page.Locator("//h3[normalize-space()='Events']");
+
+        public ILocator NoEventsMessage =>
+            _page.Locator("//div[contains(@class,'norecord_style') and normalize-space()='No events available.']");
+
+        public ILocator EventItems =>
+            _page.Locator("//h3[normalize-space()='Events']/ancestor::div[contains(@class,'db-panel')]//div[contains(@class,'always-visible')]//div[not(contains(@class,'norecord_style')) and not(contains(@class,'ps-scrollbar'))]");
+
+        // ================= Announcements Section Locators =================
+
+        public ILocator AnnouncementsHeader =>
+            _page.Locator("//h3[normalize-space()='Announcements']");
+
+        public ILocator NoAnnouncementsMessage =>
+            _page.Locator("//div[contains(@class,'norecord_style') and normalize-space()='No announcements available.']");
+
+        public ILocator AnnouncementItems =>
+            _page.Locator("//h3[normalize-space()='Announcements']/ancestor::div[contains(@class,'db-panel')]//div[contains(@class,'always-visible')]//div[not(contains(@class,'norecord_style')) and not(contains(@class,'ps-scrollbar'))]");
+        // ================= New Messages Section Locators =================
+
+        public ILocator NewMessagesHeader =>
+            _page.Locator("//h3[normalize-space()='New Messages']");
+
+        public ILocator NoNewMessagesMessage =>
+            _page.Locator("//div[contains(@class,'norecord_style') and normalize-space()='No new messages available.']");
+
+        public ILocator NewMessageItems =>
+            _page.Locator("//h3[normalize-space()='New Messages']/ancestor::div[contains(@class,'db-panel')]//div[contains(@class,'always-visible')]//div[not(contains(@class,'norecord_style')) and not(contains(@class,'ps-scrollbar'))]");
+
+
         #endregion
 
         // 🔹 Common logging method with formatting
@@ -136,8 +173,50 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
             await _page.EvaluateAsync("window.moveTo(0, 0); window.resizeTo(screen.width, screen.height);");
             LogToFile("🪟 Browser window maximized.");
         }
-            //To verify the Parish Instruction in the dashboard
-            public async Task VerifyAndGetParishInstructionsTextAsync()
+
+        public async Task OpenTestParish()
+        {
+            try
+            {
+                LogToFile("OpenTestParish started");
+
+                var oldPage = _page; // existing tab
+
+                await LnkParishes.ClickAsync();
+                LogToFile("Clicked Parishes link");
+
+                await TxtSearch.FillAsync("15057");
+                LogToFile("Entered parish search value");
+
+                // Start waiting for new tab BEFORE clicking
+                var waitForNewPage = _page.Context.WaitForPageAsync();
+
+                await BtnNextGen.ClickAsync();
+                LogToFile("Clicked NextGen button");
+
+                // Capture new tab
+                var newPage = await waitForNewPage;
+                await newPage.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+                LogToFile("New tab loaded");
+
+                // Close old tab
+                await oldPage.CloseAsync();
+                LogToFile("Previous tab closed");
+
+                // Switch context to new tab
+                _page = newPage;
+                LogToFile("Switched control to new tab");
+            }
+            catch (Exception ex)
+            {
+                LogToFile($"ERROR in OpenTestParish: {ex.Message}");
+                throw;
+            }
+        }
+
+
+        //To verify the Parish Instruction in the dashboard
+        public async Task VerifyAndGetParishInstructionsTextAsync()
         {
             LogToFile("Verifying Parish Instructions Section", true);
             string expectedText = "OptionC Parish Beta Testing Instructions";
@@ -205,32 +284,148 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
             LogToFile("🏠 Returned to Parish Dashboard after verifying Daily Readings.");
         }
 
-        public async Task VerifyEventsAtDashboardAsync()
+        // To check the Events section in Dashboard
+        public async Task<int> VerifyEventsAtDashboardAsync()
         {
-            LogToFile("Verifying Events Section", true);
+            LogToFile("Verifying Events Section at Dashboard", true);
 
             await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
 
-            if (!await EventsSection.IsVisibleAsync())
+            if (!await EventsHeader.IsVisibleAsync())
             {
-                LogToFile("❌ Events section not visible.");
+                LogToFile("❌ Events section is not visible.");
+                return 0;
+            }
+
+            if (await NoEventsMessage.IsVisibleAsync())
+            {
+                LogToFile("⚠️ No events are available in the list.");
+                return 0;
+            }
+
+            int eventCount = await EventItems.CountAsync();
+
+            LogToFile($"✅ Total Events Available: {eventCount}");
+
+            for (int i = 0; i < eventCount; i++)
+            {
+                string eventText = (await EventItems.Nth(i).InnerTextAsync()).Trim();
+                LogToFile($"   ➤ Event {i + 1}: {eventText}");
+            }
+
+            LogToFile("✔️ Events section verification completed successfully.");
+
+            return eventCount;
+        }
+
+
+
+        // To check the Task List functionality
+        public async Task VerifyTaskListSectionAsync()
+        {
+            LogToFile("Verifying Task List Section", true);
+
+            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+
+            var taskListSection = _page.Locator("//h3[normalize-space()='Task List']");
+
+            if (!await taskListSection.IsVisibleAsync())
+            {
+                LogToFile("❌ Task List section is not visible.");
                 return;
             }
 
-            // Wait for the <ul> list to appear
-            var eventsList = _page.Locator("//h3[normalize-space()='Events']/following::ul[1]");
-            await eventsList.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
+            var taskLinks = _page.Locator(
+                "//h3[normalize-space()='Task List']/ancestor::div[contains(@class,'db-panel')]//ul/li/a"
+            );
 
-            // ✅ Get all <li> items inside that <ul>
-            var eventItems = _page.Locator("//h3[normalize-space()='Events']/following::ul[1]/li");
+            int taskCount = await taskLinks.CountAsync();
 
-            int count = await eventItems.CountAsync();
+            if (taskCount == 0)
+            {
+                LogToFile("⚠️ No tasks are available in the Task List.");
+                return;
+            }
 
-            if (count == 0)
-                LogToFile("⚠️ No events are available in the list.");
-            else
-                LogToFile($"📅 Total Events Listed: {count}");
+            LogToFile($"✅ Total Tasks Available: {taskCount}");
+
+            for (int i = 0; i < taskCount; i++)
+            {
+                string taskName = (await taskLinks.Nth(i).InnerTextAsync()).Trim();
+                LogToFile($"   ➤ Task {i + 1}: {taskName}");
+            }
+
+            LogToFile("✔️ Task List verification completed successfully.");
         }
+
+        // To check the Announcements section in Dashboard
+        public async Task<int> VerifyAnnouncementsAtDashboardAsync()
+        {
+            LogToFile("Verifying Announcements Section at Dashboard", true);
+
+            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+
+            if (!await AnnouncementsHeader.IsVisibleAsync())
+            {
+                LogToFile("❌ Announcements section is not visible.");
+                return 0;
+            }
+
+            if (await NoAnnouncementsMessage.IsVisibleAsync())
+            {
+                LogToFile("⚠️ No announcements are available in the list.");
+                return 0;
+            }
+
+            int announcementCount = await AnnouncementItems.CountAsync();
+
+            LogToFile($"✅ Total Announcements Available: {announcementCount}");
+
+            for (int i = 0; i < announcementCount; i++)
+            {
+                string announcementText = (await AnnouncementItems.Nth(i).InnerTextAsync()).Trim();
+                LogToFile($"   ➤ Announcement {i + 1}: {announcementText}");
+            }
+
+            LogToFile("✔️ Announcements section verification completed successfully.");
+
+            return announcementCount;
+        }
+
+        // To check the New Messages section in Dashboard
+        public async Task<int> VerifyNewMessagesAtDashboardAsync()
+        {
+            LogToFile("Verifying New Messages Section at Dashboard", true);
+
+            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+
+            if (!await NewMessagesHeader.IsVisibleAsync())
+            {
+                LogToFile("❌ New Messages section is not visible.");
+                return 0;
+            }
+
+            if (await NoNewMessagesMessage.IsVisibleAsync())
+            {
+                LogToFile("⚠️ No new messages are available in the list.");
+                return 0;
+            }
+
+            int messageCount = await NewMessageItems.CountAsync();
+
+            LogToFile($"✅ Total New Messages Available: {messageCount}");
+
+            for (int i = 0; i < messageCount; i++)
+            {
+                string messageText = (await NewMessageItems.Nth(i).InnerTextAsync()).Trim();
+                LogToFile($"   ➤ Message {i + 1}: {messageText}");
+            }
+
+            LogToFile("✔️ New Messages section verification completed successfully.");
+
+            return messageCount;
+        }
+
 
         //Acutis Sign in
         // Load URL method    

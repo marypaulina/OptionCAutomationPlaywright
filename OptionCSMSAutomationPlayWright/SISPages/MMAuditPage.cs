@@ -121,6 +121,20 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         // X (Remind me later) button
         private ILocator SurveyCloseButton => _page.Locator("//a[contains(@class,'md-close') and @data-dismiss='modal']");
 
+        // ================= LOCATORS (All XPaths Here) =================
+
+        private ILocator DashboardSection => _page.Locator("//*[@id='sec-slider']/div");
+
+        private ILocator MaintenancePopup =>
+            _page.Locator("//div[contains(@class,'survey-modal-content')]");
+
+        private ILocator PopupCloseXButton =>
+            _page.Locator("//a[contains(@class,'uc-under-construction-x')]");
+
+        private ILocator PopupCloseButton =>
+            _page.Locator("//button[text()='CLOSE']");
+
+      
         /* Timeout Methods
          * (new() { Timeout = 60000 });
         await _page.GotoAsync(URL, new() { Timeout = 100000 });
@@ -217,6 +231,37 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             catch (PlaywrightException)
             {
                 // Popup not present – safely ignore
+            }
+        }
+
+        public async Task HandleMMMaintenancePopupIfPresentAsync()
+        {
+            try
+            {
+                // Check if popup appears within 3 seconds
+                if (await MaintenancePopup.IsVisibleAsync(new() { Timeout = 3000 }))
+                {
+                    Console.WriteLine("MattMoney Maintenance popup detected.");
+
+                    if (await PopupCloseXButton.IsVisibleAsync())
+                    {
+                        await PopupCloseXButton.ClickAsync();
+                    }
+                    else if (await PopupCloseButton.IsVisibleAsync())
+                    {
+                        await PopupCloseButton.ClickAsync();
+                    }
+
+                    Console.WriteLine("Popup closed successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("No MattMoney maintenance popup appeared.");
+                }
+            }
+            catch (TimeoutException)
+            {
+                Console.WriteLine("MM Popup not displayed. Continuing...");
             }
         }
 

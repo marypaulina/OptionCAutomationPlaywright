@@ -44,6 +44,7 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
                 string schoolCode = auditTable.Rows[i]["SchoolCode"];
                 string startDate = auditTable.Rows[i]["StartDate"];
                 await mmPage.OpenSchoolAsync(auditTable.Rows[i]["SchoolCode"]); // Search and open the school
+                await mmPage.HandleMMMaintenancePopupIfPresentAsync();
                 await mmPage.NavigateToFeeManagementAsync(); // Navigate to Fee Management
                 Console.WriteLine("Landed in Fee Management page");
                 ledgerPayments = await mmPage.GetChargesPaymentsAsync();// Verify charges, payments posted in last 24 hrs from the ledger
