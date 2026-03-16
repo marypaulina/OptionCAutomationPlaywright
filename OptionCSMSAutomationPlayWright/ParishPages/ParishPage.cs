@@ -153,7 +153,7 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task LoadURLAsync(string URL)
         {
             LogToFile("Initializing test session...", true);
-            await _page.GotoAsync(URL, new() { Timeout = 100000 });
+            await _page.GotoAsync(URL, new() { Timeout = 200000 });
             LogToFile($"🌐 Loaded URL: {URL}");
         }
         //Enter the parish user credentials
@@ -439,6 +439,7 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task EnterAcutisParishCredentialsAsync(string Username, string Password)
         {
            LogToFile("Performing Acutis Parish Login...", true);
+            await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 300000 });
             await TxtAcutisUserName.FillAsync(Username);
             await TxtAcutisPassword.FillAsync(Password);
             await BtnAcutisLogin.ClickAsync();

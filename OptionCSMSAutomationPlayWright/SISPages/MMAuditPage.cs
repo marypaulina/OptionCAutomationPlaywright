@@ -120,6 +120,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         // X (Remind me later) button
         private ILocator SurveyCloseButton => _page.Locator("//a[contains(@class,'md-close') and @data-dismiss='modal']");
+        //Reactivate popup
+        private ILocator ReactivatedCloseIcon =>
+     _page.Locator("(//a[contains(@class,'uc-under-construction-x')])[2]");
 
         // ================= LOCATORS (All XPaths Here) =================
 
@@ -265,6 +268,29 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
         }
 
+        public async Task HandleMMReactivatedPopupIfPresentAsync()
+        {
+            try
+            {
+                // Check if close icon appears within 3 seconds
+                if (await ReactivatedCloseIcon.IsVisibleAsync(new() { Timeout = 3000 }))
+                {
+                    Console.WriteLine("MattMoney Reactivated popup detected.");
+
+                    await ReactivatedCloseIcon.ClickAsync();
+
+                    Console.WriteLine("Reactivated popup closed successfully.");
+                }
+                else
+                {
+                    Console.WriteLine("No MattMoney Reactivated popup appeared.");
+                }
+            }
+            catch (TimeoutException)
+            {
+                Console.WriteLine("MM Reactivated popup not displayed. Continuing...");
+            }
+        }
 
         //public async Task<bool> VerifyAdminDashboardAsync()
         //    {
@@ -368,8 +394,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             // Wait for the Administration menu to be visible and click it
             //await AdministrationMenu.First.WaitForAsync();
-            await _page.WaitForTimeoutAsync(5000);
-            await AdministrationMenu.First.ClickAsync(new() { Timeout = 100000 });
+            await _page.WaitForTimeoutAsync(1000);
+            await AdministrationMenu.First.ClickAsync(new() { Timeout = 2000 });
 
             // Wait for the Fee Management menu to be visible and click it
             await FeeManagementMenu.WaitForAsync();
