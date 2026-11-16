@@ -41,6 +41,7 @@
         public string TotalAccountCreated { get; set; } = string.Empty;
         public string CreditCardCount { get; set; } = string.Empty;
         public string ECheckCount { get; set; } = string.Empty;
+        public string AcctsActivatedLast24Hours { get; set; } = string.Empty;
         public string CompareResults { get; set; } = string.Empty;
     }
 

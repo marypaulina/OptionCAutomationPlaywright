@@ -107,12 +107,16 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator RecordLength => _page.Locator("//*[@class='form-control input-xsmall input-inline']");
         public ILocator AllRecord => _page.Locator("//*[@class='form-control input-xsmall input-inline']//option[@value='-1']");
         public ILocator AccountCreatedRadio => _page.Locator("//input[@id='primary1']");
-        public ILocator BtnRunReport => _page.Locator("//input[@value='Run Report']");
+        //public ILocator BtnRunReport => _page.Locator("//input[@value='Run Report']");
+        public ILocator BtnRunReport => _page.Locator("//input[@type='button' and @value='Run Report' and contains(@class,'btn-info')]");
         public ILocator SchoolName => _page.Locator("//div[@class='oc-school-name']");
         public ILocator LblFundingAmount => _page.Locator("//*[@id='DataTables_Table_0']/tfoot/tr/td[2]/strong");
         public ILocator LblTransactionAmount => _page.Locator("//*[@id='DataTables_Table_0']/tfoot/tr/td[4]/strong");
         // Logout Elements
         public ILocator LinkSignout => _page.Locator("//a[@class='dropdown-item signout']");
+        public ILocator RbAccountHistory => _page.Locator("//input[@type='radio' and @id='primary3']");
+        public ILocator ThActivatedOn => _page.Locator("//th[@aria-controls='tblParentAccountSetup' and normalize-space()='Activated On']");
+
 
         //Survey Popup
         // Popup root
@@ -226,7 +230,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             try
             {
-                if (await SurveyPopup.IsVisibleAsync(new LocatorIsVisibleOptions { Timeout = 2000 }))
+                if (await SurveyPopup.IsVisibleAsync(new LocatorIsVisibleOptions { Timeout = 8000 }))
                 {
                     await SurveyCloseButton.ClickAsync();
                 }
@@ -242,7 +246,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 // Check if popup appears within 3 seconds
-                if (await MaintenancePopup.IsVisibleAsync(new() { Timeout = 3000 }))
+                if (await MaintenancePopup.IsVisibleAsync(new() { Timeout = 8000 }))
                 {
                     Console.WriteLine("MattMoney Maintenance popup detected.");
 
@@ -273,7 +277,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 // Check if close icon appears within 3 seconds
-                if (await ReactivatedCloseIcon.IsVisibleAsync(new() { Timeout = 3000 }))
+                if (await ReactivatedCloseIcon.IsVisibleAsync(new() { Timeout = 8000 }))
                 {
                     Console.WriteLine("MattMoney Reactivated popup detected.");
 
@@ -492,136 +496,353 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
         #endregion
 
-        #region Verify Account Status Report data #907
+        //#region Verify Account Status Report data #907
+        //public async Task<Report> VerifyAccountStatusAsync(Report objreport)
+        //{
+        //    try
+        //    {
+        //        await MaxWindow();
+        //        await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
+        //        await SearchFeeReportAsync(907, _page);
+        //        await MaxWindow();
+        //        var pages = _page.Context.Pages;
+        //        // Ensure multiple pages exist before switching
+        //        if (pages.Count > 1)
+        //        {
+        //            var firstPage = pages.FirstOrDefault();
+        //            if (firstPage != null && !firstPage.IsClosed)
+        //            {
+        //                await firstPage.CloseAsync();
+        //            }
+        //            // Switch to the last opened page and update _page
+        //            _page = _page.Context.Pages.LastOrDefault() ?? throw new Exception("Failed to switch to the last opened page.");
+        //            await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+        //        }
+        //        // Click on StaffCheck if visible
+        //        if (await StaffCheck.IsVisibleAsync())
+        //        {
+        //            // await StaffCheck.ClickAsync(new() { Timeout = 10000 });
+        //            // await _page.WaitForTimeoutAsync(30000);
+
+        //            await StaffCheck.ClickAsync();
+        //            await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible, Timeout = 30000 });
+
+        //        }
+        //        // Ensure 'Run Report' button is visible before clicking
+        //        // await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
+        //        //if (await _page.Locator("//input[@value='Run Report']").IsVisibleAsync())
+        //        //{
+        //        //    // Go ahead and click
+        //        //    await BtnRunReport.ClickAsync();
+        //        //}
+
+        //        //var runReportLocator = _page.Locator("//input[@value='Run Report']");
+        //        var runReportLocator = _page.Locator("//input[@type='button' and @value='Run Report' and contains(@class,'btn-info')]");
+        //        await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout =50000 });
+
+        //        if (await runReportLocator.IsVisibleAsync())
+        //        {
+        //            await BtnRunReport.ClickAsync();
+        //        }
+
+
+        //        //if (await BtnRunReport.IsEnabledAsync())
+        //        //{
+        //        //    await BtnRunReport.ClickAsync(new() { Timeout = 100000 });
+        //        //    await _page.WaitForTimeoutAsync(100000);
+        //        //    Console.WriteLine("Run Report button clicked.");
+        //        //}
+        //        else
+        //        {
+        //            throw new Exception("Run Report button is disabled or not interactable.");
+        //        }
+        //        // Wait for dropdown visibility
+        //        await _page.WaitForSelectorAsync("//*[@class='form-control input-xsmall input-inline']", new() { State = WaitForSelectorState.Visible });
+
+        //        if (await RecordLength.IsVisibleAsync())
+        //        {
+        //            await RecordLength.SelectOptionAsync("-1");
+        //            Console.WriteLine("Record Length dropdown set to -1.");
+        //        }
+        //        else
+        //        {
+        //            throw new Exception("Record Length dropdown not found.");
+        //        }
+        //        await _page.WaitForTimeoutAsync(2000); // Allow table update
+        //        // Fetch row counts
+        //        var primaryRows = await _page.Locator("//table//tbody//tr").CountAsync();
+        //        var rowsCount = await _page.Locator("//*[@id='tblParentAccountSetup']/tbody/tr/td[@class='dataTables_empty']").CountAsync();
+        //        objreport.TotalPrimaryAccount = (rowsCount != 1) ? primaryRows.ToString() : "0";
+        //        await using (StreamWriter writer = new StreamWriter(path, true))
+        //        {
+        //            await writer.WriteLineAsync($"\r\nACCOUNT SETUP STATISTICS\r\n========================\r\nTotal Primary Accounts: {objreport.TotalPrimaryAccount}");
+        //        }
+        //        // Ensure dropdown selection again
+        //        if (await RecordLength.IsVisibleAsync())
+        //        {
+        //            await RecordLength.SelectOptionAsync("-1");
+        //        }
+        //        // Click 'Account Created' radio button if visible
+        //        if (await AccountCreatedRadio.IsVisibleAsync())
+        //        {
+        //            await AccountCreatedRadio.ClickAsync();
+        //            Console.WriteLine("Account Created Radio button clicked.");
+        //        }
+        //        // Click 'Run Report' again
+        //        if (await BtnRunReport.IsEnabledAsync())
+        //        {
+        //            await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
+        //            Console.WriteLine("Run Report clicked again.");
+        //        }
+        //        else
+        //        {
+        //            Console.WriteLine("Run Report button is disabled.");
+        //        }
+        //        await _page.WaitForTimeoutAsync(2000); // Allow table update
+        //        // Fetch updated row count
+        //        var totalAccountsCreated = await _page.Locator("//table//tbody//tr").CountAsync();
+        //        var rowsCount1 = await _page.Locator("//*[@id='tblParentAccountSetup']/tbody/tr/td[@class='dataTables_empty']").CountAsync();
+        //        objreport.TotalAccountCreated = (rowsCount1 != 1) ? totalAccountsCreated.ToString() : "0";
+        //        await using (StreamWriter writer = new StreamWriter(path, true))
+        //        {
+        //            await writer.WriteLineAsync($"Total Accounts Created: {objreport.TotalAccountCreated}");
+        //        }
+        //        // Extracting yesterday’s date
+        //        string yesterdayString = DateTime.Now.AddDays(-1).ToString("MM/dd/yyyy");
+        //        long creditCardCount = 0, eCheckCount = 0;
+        //        if (rowsCount1 != 1)
+        //        {
+        //            var rows = await _page.Locator("//table//tbody//tr").AllAsync();
+        //            foreach (var row in rows)
+        //            {
+        //                var status = await row.Locator("td:nth-of-type(7)").InnerTextAsync();
+        //                var dateText = await row.Locator("td:nth-of-type(8)").InnerTextAsync();
+        //                var typeText = await row.Locator("td:nth-of-type(6)").InnerTextAsync();
+        //                var nameText = await row.Locator("td:nth-of-type(4)").InnerTextAsync();
+
+        //                if (DateTime.TryParse(dateText, out DateTime dateParsed))
+        //                {
+        //                    string dateFormatted = dateParsed.ToString("MM/dd/yyyy");
+
+        //                    if ((status.Contains("In Progress")) || dateFormatted == yesterdayString)
+        //                    {
+        //                        string accountStatus = $"Name: {nameText} ; Date: {dateText} ; Status: {status} ; Account Type: {typeText} ;";
+
+        //                        await using (StreamWriter writer = new StreamWriter(path, true))
+        //                        {
+        //                            await writer.WriteLineAsync(accountStatus);
+        //                        }
+
+        //                        objreport.AccountStatus += accountStatus + "\n";
+        //                    }
+
+        //                    if (typeText == "Credit Card") creditCardCount++;
+        //                    else eCheckCount++;
+        //                }
+        //            }
+        //        }
+        //        objreport.CreditCardCount = creditCardCount.ToString();
+        //        objreport.ECheckCount = eCheckCount.ToString();
+        //        await using (StreamWriter writer = new StreamWriter(path, true))
+        //        {
+        //            await writer.WriteLineAsync($"Total CC Accounts Created: {creditCardCount}\r\nTotal eCheck Accounts Created: {eCheckCount}");
+        //            await writer.WriteLineAsync("###############################################################################");
+        //        }
+        //        return objreport;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.WriteLine($"Error encountered: {ex.Message}");
+        //        throw;
+        //    }
+        //}
+        //#endregion
+
+
+        #region Account Activated On , Verify Account Status Report data #907
+
         public async Task<Report> VerifyAccountStatusAsync(Report objreport)
         {
             try
             {
                 await MaxWindow();
-                await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
+
+                await _page.GotoAsync(
+                    "https://feemanagement.optionc.com/report-list",
+                    new() { Timeout = 100000 });
+
                 await SearchFeeReportAsync(907, _page);
+
                 await MaxWindow();
+
                 var pages = _page.Context.Pages;
-                // Ensure multiple pages exist before switching
+
+                // Switch to the newly opened report page
                 if (pages.Count > 1)
                 {
                     var firstPage = pages.FirstOrDefault();
+
                     if (firstPage != null && !firstPage.IsClosed)
                     {
                         await firstPage.CloseAsync();
                     }
-                    // Switch to the last opened page and update _page
-                    _page = _page.Context.Pages.LastOrDefault() ?? throw new Exception("Failed to switch to the last opened page.");
+
+                    _page = _page.Context.Pages.LastOrDefault()
+                        ?? throw new Exception("Failed to switch to the last opened page.");
+
                     await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
                 }
-                // Click on StaffCheck if visible
+
+                // Select Staff if visible
                 if (await StaffCheck.IsVisibleAsync())
                 {
-                    // await StaffCheck.ClickAsync(new() { Timeout = 10000 });
-                    // await _page.WaitForTimeoutAsync(30000);
-
                     await StaffCheck.ClickAsync();
-                    await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible, Timeout = 20000 });
 
+                    await _page.WaitForSelectorAsync(
+                        "//input[@value='Run Report']",
+                        new()
+                        {
+                            State = WaitForSelectorState.Visible,
+                            Timeout = 30000
+                        });
                 }
-                // Ensure 'Run Report' button is visible before clicking
-                // await _page.WaitForSelectorAsync("//input[@value='Run Report']", new() { State = WaitForSelectorState.Visible });
-                //if (await _page.Locator("//input[@value='Run Report']").IsVisibleAsync())
-                //{
-                //    // Go ahead and click
-                //    await BtnRunReport.ClickAsync();
-                //}
 
-                var runReportLocator = _page.Locator("//input[@value='Run Report']");
-                await runReportLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 100000 });
+                // Run Report
+                var runReportLocator = _page.Locator(
+                    "//input[@type='button' and @value='Run Report' and contains(@class,'btn-info')]");
 
-                if (await runReportLocator.IsVisibleAsync())
+                await runReportLocator.WaitForAsync(
+                    new()
+                    {
+                        State = WaitForSelectorState.Visible,
+                        Timeout = 50000
+                    });
+
+                if (await runReportLocator.IsVisibleAsync() &&
+                    await runReportLocator.IsEnabledAsync())
                 {
                     await BtnRunReport.ClickAsync();
                 }
-
-
-                //if (await BtnRunReport.IsEnabledAsync())
-                //{
-                //    await BtnRunReport.ClickAsync(new() { Timeout = 100000 });
-                //    await _page.WaitForTimeoutAsync(100000);
-                //    Console.WriteLine("Run Report button clicked.");
-                //}
                 else
                 {
                     throw new Exception("Run Report button is disabled or not interactable.");
                 }
-                // Wait for dropdown visibility
-                await _page.WaitForSelectorAsync("//*[@class='form-control input-xsmall input-inline']", new() { State = WaitForSelectorState.Visible });
 
-                if (await RecordLength.IsVisibleAsync())
-                {
-                    await RecordLength.SelectOptionAsync("-1");
-                    Console.WriteLine("Record Length dropdown set to -1.");
-                }
-                else
-                {
-                    throw new Exception("Record Length dropdown not found.");
-                }
-                await _page.WaitForTimeoutAsync(2000); // Allow table update
-                // Fetch row counts
-                var primaryRows = await _page.Locator("//table//tbody//tr").CountAsync();
-                var rowsCount = await _page.Locator("//*[@id='tblParentAccountSetup']/tbody/tr/td[@class='dataTables_empty']").CountAsync();
-                objreport.TotalPrimaryAccount = (rowsCount != 1) ? primaryRows.ToString() : "0";
+                // Wait for Record Length dropdown
+                await RecordLength.WaitForAsync(
+                    new()
+                    {
+                        State = WaitForSelectorState.Visible,
+                        Timeout = 30000
+                    });
+
+                // Display all records
+                await RecordLength.SelectOptionAsync("-1");
+
+                await _page.WaitForTimeoutAsync(2000);
+
+                // --------------------------------------------------
+                // 1. TOTAL PRIMARY ACCOUNTS
+                // --------------------------------------------------
+
+                var primaryRows = await _page.Locator(
+                    "//table[@id='tblParentAccountSetup']/tbody/tr").CountAsync();
+
+                var emptyRows = await _page.Locator(
+                    "//*[@id='tblParentAccountSetup']/tbody/tr/td[contains(@class,'dataTables_empty')]").CountAsync();
+
+                objreport.TotalPrimaryAccount =
+                    emptyRows == 1 ? "0" : primaryRows.ToString();
+
                 await using (StreamWriter writer = new StreamWriter(path, true))
                 {
-                    await writer.WriteLineAsync($"\r\nACCOUNT SETUP STATISTICS\r\n========================\r\nTotal Primary Accounts: {objreport.TotalPrimaryAccount}");
+                    await writer.WriteLineAsync(
+                        $"\r\nACCOUNT SETUP STATISTICS\r\n" +
+                        $"========================\r\n" +
+                        $"Total Primary Accounts: {objreport.TotalPrimaryAccount}");
                 }
-                // Ensure dropdown selection again
-                if (await RecordLength.IsVisibleAsync())
-                {
-                    await RecordLength.SelectOptionAsync("-1");
-                }
-                // Click 'Account Created' radio button if visible
+
+                // --------------------------------------------------
+                // 2. ACCOUNT CREATED REPORT
+                // --------------------------------------------------
+
                 if (await AccountCreatedRadio.IsVisibleAsync())
                 {
                     await AccountCreatedRadio.ClickAsync();
+
                     Console.WriteLine("Account Created Radio button clicked.");
                 }
-                // Click 'Run Report' again
+
                 if (await BtnRunReport.IsEnabledAsync())
                 {
                     await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
-                    Console.WriteLine("Run Report clicked again.");
+
+                    Console.WriteLine("Run Report clicked for Account Created.");
                 }
                 else
                 {
-                    Console.WriteLine("Run Report button is disabled.");
+                    throw new Exception("Run Report button is disabled for Account Created.");
                 }
-                await _page.WaitForTimeoutAsync(2000); // Allow table update
-                // Fetch updated row count
-                var totalAccountsCreated = await _page.Locator("//table//tbody//tr").CountAsync();
-                var rowsCount1 = await _page.Locator("//*[@id='tblParentAccountSetup']/tbody/tr/td[@class='dataTables_empty']").CountAsync();
-                objreport.TotalAccountCreated = (rowsCount1 != 1) ? totalAccountsCreated.ToString() : "0";
+
+                await _page.WaitForTimeoutAsync(2000);
+
+                // Display all records again
+                if (await RecordLength.IsVisibleAsync())
+                {
+                    await RecordLength.SelectOptionAsync("-1");
+                }
+
+                await _page.WaitForTimeoutAsync(1000);
+
+                // Fetch Account Created row count
+                var totalAccountsCreated = await _page.Locator(
+                    "//table[@id='tblParentAccountSetup']/tbody/tr").CountAsync();
+
+                var emptyRows1 = await _page.Locator(
+                    "//*[@id='tblParentAccountSetup']/tbody/tr/td[contains(@class,'dataTables_empty')]").CountAsync();
+
+                objreport.TotalAccountCreated =
+                    emptyRows1 == 1 ? "0" : totalAccountsCreated.ToString();
+
                 await using (StreamWriter writer = new StreamWriter(path, true))
                 {
-                    await writer.WriteLineAsync($"Total Accounts Created: {objreport.TotalAccountCreated}");
+                    await writer.WriteLineAsync(
+                        $"Total Accounts Created: {objreport.TotalAccountCreated}");
                 }
-                // Extracting yesterday’s date
+
+                // --------------------------------------------------
+                // 3. ACCOUNT CREATED DETAILS AND PAYMENT TYPE COUNT
+                // --------------------------------------------------
+
                 string yesterdayString = DateTime.Now.AddDays(-1).ToString("MM/dd/yyyy");
-                long creditCardCount = 0, eCheckCount = 0;
-                if (rowsCount1 != 1)
+
+                long creditCardCount = 0;
+                long eCheckCount = 0;
+
+                if (emptyRows1 != 1)
                 {
-                    var rows = await _page.Locator("//table//tbody//tr").AllAsync();
+                    var rows = await _page.Locator(
+                        "//table[@id='tblParentAccountSetup']/tbody/tr").AllAsync();
+
                     foreach (var row in rows)
                     {
-                        var status = await row.Locator("td:nth-of-type(7)").InnerTextAsync();
-                        var dateText = await row.Locator("td:nth-of-type(8)").InnerTextAsync();
-                        var typeText = await row.Locator("td:nth-of-type(6)").InnerTextAsync();
-                        var nameText = await row.Locator("td:nth-of-type(4)").InnerTextAsync();
+                        var status = (await row.Locator("td:nth-of-type(7)").InnerTextAsync()).Trim();
+
+                        var dateText = (await row.Locator("td:nth-of-type(8)").InnerTextAsync()).Trim();
+
+                        var typeText = (await row.Locator("td:nth-of-type(6)").InnerTextAsync()).Trim();
+
+                        var nameText = (await row.Locator("td:nth-of-type(4)").InnerTextAsync()).Trim();
 
                         if (DateTime.TryParse(dateText, out DateTime dateParsed))
                         {
                             string dateFormatted = dateParsed.ToString("MM/dd/yyyy");
 
-                            if ((status.Contains("In Progress")) || dateFormatted == yesterdayString)
+                            if (status.Contains("In Progress") || dateFormatted == yesterdayString)
                             {
-                                string accountStatus = $"Name: {nameText} ; Date: {dateText} ; Status: {status} ; Account Type: {typeText} ;";
+                                string accountStatus =
+                                    $"Name: {nameText} ; Date: {dateText} ; " +
+                                    $"Status: {status} ; Account Type: {typeText} ;";
 
                                 await using (StreamWriter writer = new StreamWriter(path, true))
                                 {
@@ -631,27 +852,231 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                                 objreport.AccountStatus += accountStatus + "\n";
                             }
 
-                            if (typeText == "Credit Card") creditCardCount++;
-                            else eCheckCount++;
+                            if (typeText.Equals("Credit Card", StringComparison.OrdinalIgnoreCase))
+                            {
+                                creditCardCount++;
+                            }
+                            else if (typeText.Equals("eCheck", StringComparison.OrdinalIgnoreCase))
+                            {
+                                eCheckCount++;
+                            }
                         }
                     }
                 }
+
                 objreport.CreditCardCount = creditCardCount.ToString();
                 objreport.ECheckCount = eCheckCount.ToString();
+
                 await using (StreamWriter writer = new StreamWriter(path, true))
                 {
-                    await writer.WriteLineAsync($"Total CC Accounts Created: {creditCardCount}\r\nTotal eCheck Accounts Created: {eCheckCount}");
-                    await writer.WriteLineAsync("###############################################################################");
+                    await writer.WriteLineAsync(
+                        $"Total CC Accounts Created: {creditCardCount}\r\n" +
+                        $"Total eCheck Accounts Created: {eCheckCount}");
                 }
+
+                // --------------------------------------------------
+                // 4. ACCOUNT HISTORY - ACTIVATED IN LAST 24 HOURS
+                // --------------------------------------------------
+
+                LogToFile("Checking Account History - Accounts Activated in Last 24 Hours", true);
+
+                // Select Account History radio button
+                if (await RbAccountHistory.IsVisibleAsync())
+                {
+                    await RbAccountHistory.ClickAsync();
+
+                    LogToFile("Account History radio button selected.");
+                }
+                else
+                {
+                    throw new Exception("Account History radio button not found.");
+                }
+
+                // Run Account History report
+                if (await BtnRunReport.IsEnabledAsync())
+                {
+                    await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
+
+                    LogToFile("Run Report clicked for Account History.");
+                }
+                else
+                {
+                    throw new Exception("Run Report button is disabled for Account History.");
+                }
+
+                // Wait for Account History grid
+                await ThActivatedOn.WaitForAsync(
+                    new()
+                    {
+                        State = WaitForSelectorState.Visible,
+                        Timeout = 30000
+                    });
+
+                await _page.WaitForTimeoutAsync(1500);
+
+                // Display all Account History records
+                if (await RecordLength.IsVisibleAsync())
+                {
+                    await RecordLength.SelectOptionAsync("-1");
+
+                    LogToFile("Account History Record Length set to All.");
+                }
+
+                await _page.WaitForTimeoutAsync(1500);
+
+                // Sort Activated On column in descending order
+                var sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
+
+                if (sortOrder != "descending")
+                {
+                    await ThActivatedOn.ClickAsync();
+
+                    await _page.WaitForTimeoutAsync(1000);
+
+                    sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
+
+                    // If first click sorts ascending, click again for descending
+                    if (sortOrder != "descending")
+                    {
+                        await ThActivatedOn.ClickAsync();
+
+                        await _page.WaitForTimeoutAsync(1000);
+                    }
+                }
+
+                LogToFile("Activated On column sorted in descending order.");
+
+                // Calculate the previous 24 hours
+                DateTime currentTime = DateTime.Now;
+
+                DateTime last24Hours = currentTime.AddHours(-24);
+
+                int activatedCount = 0;
+
+                // Get all Account History rows
+                var accountHistoryRows = _page.Locator(
+                    "//table[@id='tblParentAccountSetup']/tbody/tr");
+
+                int historyRowCount = await accountHistoryRows.CountAsync();
+
+                LogToFile($"Total Account History records: {historyRowCount}");
+
+                // Read Activated On date from the 9th column
+                for (int i = 0; i < historyRowCount; i++)
+                {
+                    var row = accountHistoryRows.Nth(i);
+
+                    // Skip empty table message
+                    if (await row.Locator("td.dataTables_empty").CountAsync() > 0)
+                    {
+                        continue;
+                    }
+
+                    var activatedCell = row.Locator("td").Nth(8);
+
+                    // Read data-sort attribute
+                    string activatedDateText =
+                        await activatedCell.GetAttributeAsync("data-sort") ?? string.Empty;
+
+                    if (string.IsNullOrWhiteSpace(activatedDateText))
+                    {
+                        continue;
+                    }
+
+                    // Parse date format: 20260817 05:00:00 AM
+                    if (DateTime.TryParseExact(
+                        activatedDateText.Trim(),
+                        "yyyyMMdd hh:mm:ss tt",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out DateTime activatedDate))
+                    {
+                        // Check whether activation happened within the last 24 hours
+                        if (activatedDate >= last24Hours &&
+                            activatedDate <= currentTime)
+                        {
+                            activatedCount++;
+
+                            LogToFile(
+                                $"Activated Account: {activatedDate:MM/dd/yyyy hh:mm:ss tt}");
+                        }
+                    }
+                    else
+                    {
+                        LogToFile(
+                            $"Unable to parse Activated On date: {activatedDateText}");
+                    }
+                }
+
+                // Store result in Report object
+                objreport.AcctsActivatedLast24Hours = activatedCount.ToString();
+
+                LogToFile(
+                    $"Total Accounts Activated in the Last 24 Hours: {activatedCount}");
+
+                // Write result to log file
+                await using (StreamWriter writer = new StreamWriter(path, true))
+                {
+                    await writer.WriteLineAsync(
+                        $"Accts Activated (Last 24 hrs): {objreport.AcctsActivatedLast24Hours}");
+
+                    await writer.WriteLineAsync(
+                        "###############################################################################");
+                }
+
                 return objreport;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error encountered: {ex.Message}");
+
+                LogToFile($"Error in Account Status Report: {ex.Message}");
+
                 throw;
             }
         }
+
+        private void LogToFile(string message)
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(path, true))
+                {
+                    writer.WriteLine($"{DateTime.Now:MM/dd/yyyy hh:mm:ss tt} - {message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error writing to log file: {ex.Message}");
+            }
+        }
+
+        private void LogToFile(string message, bool addHeader)
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(path, true))
+                {
+                    if (addHeader)
+                    {
+                        writer.WriteLine();
+                        writer.WriteLine("==================================================");
+                        writer.WriteLine($"{DateTime.Now:MM/dd/yyyy hh:mm:ss tt} - {message}");
+                        writer.WriteLine("==================================================");
+                    }
+                    else
+                    {
+                        writer.WriteLine($"{DateTime.Now:MM/dd/yyyy hh:mm:ss tt} - {message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error writing to log file: {ex.Message}");
+            }
+        }
         #endregion
+
 
         #region Report Button Filter, write the report value and compare results are matching or not
         public async Task<ReportData> StartFilterAsync(Int64 ReportId, Report objReport)
@@ -870,8 +1295,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             using (ExcelPackage package = new ExcelPackage(new FileInfo(filePath)))
             {
-                ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2025-2026")
-                                              ?? package.Workbook.Worksheets.Add("2025-2026");
+                ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2026-2027")
+                                              ?? package.Workbook.Worksheets.Add("2026-2027");
                 // Set the column widths manually
                 workSheet.Columns[1].Width = 3;
                 workSheet.Columns[2].Width = 35;
@@ -891,8 +1316,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Columns[16].Width = 8;
                 workSheet.Columns[17].Width = 10;
                 workSheet.Columns[18].Width = 10;
-                workSheet.Columns[19].Width = 63;
-                workSheet.Columns[20].Width = 65;             
+                workSheet.Columns[19].Width = 10;
+                workSheet.Columns[20].Width = 63;
+                workSheet.Columns[21].Width = 65;             
                 int lastRow = tab + 2;
                 int headerRow = 1;
                 int dataStartRow = 2 + tab;
@@ -919,6 +1345,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         "Total Acc. Created",
                         "Total CC Acc. Created",
                         "Total eCheck Acc. Created",
+                        "Acts Activated (Last 24 hrs)",
                         "New/ InProgress Account",
                         "Funding Amount vs Transaction Amount (902 & 905)"
                     };
@@ -953,8 +1380,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"P{lastRow}"].Value = ConvertToInt(objReport?.TotalAccountCreated ?? "0");
                 workSheet.Cells[$"Q{lastRow}"].Value = ConvertToInt(objReport?.CreditCardCount ?? "0");
                 workSheet.Cells[$"R{lastRow}"].Value = ConvertToInt(objReport?.ECheckCount ?? "0");
-                workSheet.Cells[$"S{lastRow}"].Value = objReport?.AccountStatus;
-                workSheet.Cells[$"T{lastRow}"].Value = objReport?.CompareResults;
+                workSheet.Cells[$"S{lastRow}"].Value = ConvertToInt(objReport?.AcctsActivatedLast24Hours ?? "0");
+                workSheet.Cells[$"T{lastRow}"].Value = objReport?.AccountStatus;
+                workSheet.Cells[$"U{lastRow}"].Value = objReport?.CompareResults;
                 // Apply Row Formatting
                 for (int col = 1; col <= workSheet.Dimension.Columns; col++)
                 {
@@ -1004,7 +1432,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"A1:T{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                 workSheet.View.ShowGridLines = false;
                 // Applying Borders
-                using (ExcelRange range = workSheet.Cells[$"A1:T{finalRow}"])
+                using (ExcelRange range = workSheet.Cells[$"A1:U{finalRow}"])
                 {
                     range.Style.Border.Top.Style = ExcelBorderStyle.Thin;
                     range.Style.Border.Bottom.Style = ExcelBorderStyle.Thin;

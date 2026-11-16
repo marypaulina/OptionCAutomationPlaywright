@@ -180,7 +180,7 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
             {
                 LogToFile("OpenTestParish started");
 
-                var oldPage = _page; // existing tab
+                var oldPage = _page;
 
                 await LnkParishes.ClickAsync();
                 LogToFile("Clicked Parishes link");
@@ -188,23 +188,30 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
                 await TxtSearch.FillAsync("15057");
                 LogToFile("Entered parish search value");
 
-                // Start waiting for new tab BEFORE clicking
-                var waitForNewPage = _page.Context.WaitForPageAsync();
+                // Wait for new tab + click together
+                var pageTask = _page.Context.WaitForPageAsync();
 
                 await BtnNextGen.ClickAsync();
                 LogToFile("Clicked NextGen button");
 
                 // Capture new tab
-                var newPage = await waitForNewPage;
-                await newPage.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+                var newPage = await pageTask;
+
+                // Wait for usable state instead of full load
+                await newPage.WaitForTimeoutAsync(3000);
+
                 LogToFile("New tab loaded");
 
-                // Close old tab
-                await oldPage.CloseAsync();
-                LogToFile("Previous tab closed");
-
-                // Switch context to new tab
+                // Switch to new page first
                 _page = newPage;
+
+                // Close old page safely
+                if (!oldPage.IsClosed)
+                {
+                    await oldPage.CloseAsync();
+                    LogToFile("Previous tab closed");
+                }
+
                 LogToFile("Switched control to new tab");
             }
             catch (Exception ex)
@@ -213,7 +220,6 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
                 throw;
             }
         }
-
 
         //To verify the Parish Instruction in the dashboard
         public async Task VerifyAndGetParishInstructionsTextAsync()
@@ -432,7 +438,7 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task LoadAcutisURLAsync(string URL)
         {
             LogToFile("Initializing test session...", true);
-            await _page.GotoAsync(URL, new() { Timeout = 10000 });
+            await _page.GotoAsync(URL, new() { Timeout = 30000 });
             LogToFile($"🌐 Loaded URL: {URL}");
         }
         //Enter the parish user credentials
