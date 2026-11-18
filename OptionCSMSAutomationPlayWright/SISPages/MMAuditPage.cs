@@ -430,6 +430,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     rangeEnd = finalDate;
 
                 yield return (rangeStart, rangeEnd);
+                // Ranges are inclusive; begin the next range the day after this one ends.
                 rangeStart = rangeEnd.AddDays(1);
             }
         }
@@ -531,17 +532,47 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
                 await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
                 await WaitForLocatorWithFallbackAsync(Table911);
-                await WaitForLocatorWithFallbackAsync(Report911Value.First);
 
-                var amountText = (await Report911Value.First.InnerTextAsync()).Trim();
-                if (!decimal.TryParse(
-                        amountText,
-                        NumberStyles.Currency,
-                        CultureInfo.GetCultureInfo("en-US"),
-                        out var rangeAmount))
+                await _page.WaitForFunctionAsync(
+                    "() => {" +
+                    "const table = document.querySelector('#Table3');" +
+                    "if (!table || table.getClientRects().length === 0) return false;" +
+                    "const empty = table.querySelector('tbody td.dataTables_empty');" +
+                    "const text = (table.innerText || '').toLowerCase();" +
+                    "const noData = text.includes('no data') || text.includes('no record') || text.includes('no matching');" +
+                    "const total = table.querySelector('tfoot td:nth-child(2)');" +
+                    "return (empty && empty.getClientRects().length > 0) || noData || (total && total.getClientRects().length > 0);" +
+                    "}",
+                    null,
+                    new() { Timeout = MaximumUiWaitTimeoutMs });
+
+                var emptyResult = Table911.Locator("tbody td.dataTables_empty");
+                var resultText = (await Table911.InnerTextAsync()).ToLowerInvariant();
+                var hasNoData = await emptyResult.CountAsync() > 0
+                    && await emptyResult.First.IsVisibleAsync();
+                hasNoData = hasNoData
+                    || resultText.Contains("no data")
+                    || resultText.Contains("no record")
+                    || resultText.Contains("no matching");
+
+                decimal rangeAmount;
+                if (hasNoData)
                 {
-                    throw new FormatException(
-                        $"Report 911 returned an invalid total for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: '{amountText}'.");
+                    rangeAmount = 0m;
+                }
+                else
+                {
+                    await WaitForLocatorWithFallbackAsync(Report911Value.First);
+                    var amountText = (await Report911Value.First.InnerTextAsync()).Trim();
+                    if (!decimal.TryParse(
+                            amountText,
+                            NumberStyles.Currency,
+                            CultureInfo.GetCultureInfo("en-US"),
+                            out rangeAmount))
+                    {
+                        throw new FormatException(
+                            $"Report 911 returned an invalid total for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: '{amountText}'.");
+                    }
                 }
 
                 total += rangeAmount;
