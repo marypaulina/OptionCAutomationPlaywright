@@ -511,13 +511,32 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         const jquery = window.jQuery;
                         if (!jquery || !jquery.fn || typeof jquery.fn.datepicker !== 'function')
                             return false;
-                        jquery(input).datepicker('update', value);
+                        const parts = value.split(/[/-]/).map(Number);
+                        const [year, month, day] = parts[0] > 999
+                            ? parts
+                            : [parts[2], parts[0], parts[1]];
+                        if (!year || !month || !day)
+                            return false;
+                        jquery(input).datepicker('update', new Date(year, month - 1, day));
                         return true;
                     }",
                     expectedValue);
-                if (datepickerUpdated)
-                    await dateInput.PressAsync("Tab");
                 actualValue = await dateInput.InputValueAsync();
+                if (!datepickerUpdated || !IsDateValue(date, actualValue))
+                {
+                    await dateInput.EvaluateAsync(
+                        @"(input, value) => {
+                            const valueSetter = Object.getOwnPropertyDescriptor(
+                                HTMLInputElement.prototype,
+                                'value').set;
+                            valueSetter.call(input, value);
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                        }",
+                        expectedValue);
+                    actualValue = await dateInput.InputValueAsync();
+                }
+
                 if (!IsDateValue(date, actualValue))
                 {
                     throw new InvalidOperationException(
