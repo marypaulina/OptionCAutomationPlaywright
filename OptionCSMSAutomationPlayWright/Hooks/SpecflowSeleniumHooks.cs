@@ -3,7 +3,6 @@ using AventStack.ExtentReports.Gherkin.Model;
 using AventStack.ExtentReports.Reporter;
 using BoDi;
 using Microsoft.Playwright;
-using System.Diagnostics;
 using TechTalk.SpecFlow;
 
 namespace OptionCSMSAutomationPlayWright.Hooks
@@ -187,17 +186,15 @@ namespace OptionCSMSAutomationPlayWright.Hooks
         [AfterFeature]
         public static void AfterFeature()
         {
-            extent.Flush();
-        }
-
-        [AfterTestRun]
-        public static void AfterTestRun()
-        {
-            Process[] playwrightProcesses = Process.GetProcessesByName("playwright");
-            foreach (var playwrightProcess in playwrightProcesses)
+            try
             {
-                playwrightProcess.Kill();
+                extent.Flush();
+            }
+            catch (TypeLoadException ex)
+            {
+                Console.WriteLine($"Extent HTML report could not be flushed: {ex.Message}");
             }
         }
+
     }
 }

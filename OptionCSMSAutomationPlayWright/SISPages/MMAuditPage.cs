@@ -435,6 +435,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
         }
 
+        private static bool IsReport911NoDataMessage(string text)
+        {
+            return text.Contains("no data", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("no record", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("no matching", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("no transaction", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("no result", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static async Task SetReportDateFilterAsync(ILocator dateInput, DateTime date, string fieldName)
         {
             await dateInput.WaitForAsync(new() { State = WaitForSelectorState.Visible });
@@ -504,7 +513,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await MaxWindow();
         }
 
-        private async Task<decimal> GetReport911TotalAsync()
+        private async Task<decimal> GetReport911TotalAsync(StreamWriter auditWriter)
         {
             if (await TransEndDateFilter.CountAsync() == 0)
             {
@@ -530,26 +539,54 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     throw new InvalidOperationException("Report 911 Run Report button is disabled.");
 
                 await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
-                await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
-                await WaitForLocatorWithFallbackAsync(Table911);
+                var hasNoData = false;
+                try
+                {
+                    await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
+                    await WaitForLocatorWithFallbackAsync(Table911);
+                }
+                catch (TimeoutException ex)
+                {
+                    var pageText = await _page.Locator("body").InnerTextAsync();
+                    if (!IsReport911NoDataMessage(pageText))
+                    {
+                        throw new TimeoutException(
+                            $"Report 911 did not show a result table or a no-data message for " +
+                            $"{startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}.",
+                            ex);
+                    }
 
-                var emptyResult = Table911.Locator("tbody td.dataTables_empty");
-                var resultText = (await Table911.InnerTextAsync()).ToLowerInvariant();
-                var emptyResultCount = await emptyResult.CountAsync();
-                var hasNoData = (emptyResultCount > 0 && await emptyResult.First.IsVisibleAsync())
-                    || resultText.Contains("no data")
-                    || resultText.Contains("no record")
-                    || resultText.Contains("no matching");
-                var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
-                var footerCount = await Report911Value.CountAsync();
+                    hasNoData = true;
+                }
+
+                if (!hasNoData)
+                {
+                    var emptyResult = Table911.Locator("tbody td.dataTables_empty");
+                    var emptyResultCount = await emptyResult.CountAsync();
+                    var resultText = await Table911.InnerTextAsync();
+                    hasNoData = (emptyResultCount > 0 && await emptyResult.First.IsVisibleAsync())
+                        || IsReport911NoDataMessage(resultText);
+                }
 
                 decimal rangeAmount;
-                if (hasNoData || (bodyRowCount == 0 && footerCount == 0))
+                if (hasNoData)
                 {
                     rangeAmount = 0m;
                 }
                 else
                 {
+                    var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
+                    var footerCount = await Report911Value.CountAsync();
+                    if (bodyRowCount == 0 && footerCount == 0)
+                    {
+                        rangeAmount = 0m;
+                        total += rangeAmount;
+                        await auditWriter.WriteLineAsync(
+                            $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: $0.00 (no rows)");
+                        await auditWriter.FlushAsync();
+                        continue;
+                    }
+
                     if (footerCount == 0)
                     {
                         throw new InvalidOperationException(
@@ -570,14 +607,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }
 
                 total += rangeAmount;
-                await File.AppendAllTextAsync(
-                    path,
-                    $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: {rangeAmount.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}{Environment.NewLine}");
+                await auditWriter.WriteLineAsync(
+                    $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: {rangeAmount.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}");
+                await auditWriter.FlushAsync();
             }
 
-            await File.AppendAllTextAsync(
-                path,
-                $"Report 911 combined total: {total.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}{Environment.NewLine}");
+            await auditWriter.WriteLineAsync(
+                $"Report 911 combined total: {total.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}");
+            await auditWriter.FlushAsync();
 
             return total;
         }
@@ -1270,7 +1307,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
 
         #region Report Button Filter, write the report value and compare results are matching or not
-        public async Task<ReportData> StartFilterAsync(Int64 ReportId, Report objReport)
+        public async Task<ReportData> StartFilterAsync(Int64 ReportId, Report objReport, StreamWriter auditWriter)
         {
 
             var reportData = new ReportData();
@@ -1295,6 +1332,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             _page = lastPage;
             _page.SetDefaultTimeout(30000);
             await _page.BringToFrontAsync(); // Bring the last page to the front
+            await MaxWindow();
 
             if (ReportId != 911)
             {
@@ -1307,7 +1345,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             if (ReportId == 911)
             {
-                var report911Total = await GetReport911TotalAsync();
+                var report911Total = await GetReport911TotalAsync(auditWriter);
                 reportData.ReportValue = report911Total.ToString("F2", CultureInfo.CurrentCulture);
                 return reportData;
             }
@@ -1415,7 +1453,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                         await SearchFeeReportAsync(reportId, _page);
                         await MaxWindow();
-                        ReportData reportData = await StartFilterAsync(reportId, objReport);
+                        ReportData reportData = await StartFilterAsync(reportId, objReport, writer);
 
                         switch (reportId)
                         {
