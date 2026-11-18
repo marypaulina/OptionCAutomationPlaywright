@@ -572,13 +572,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 var reportWait = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
-                    await _page.RunAndWaitForNavigationAsync(
-                        () => Btn911Filter.ClickAsync(),
-                        new()
-                        {
-                            WaitUntil = WaitUntilState.DOMContentLoaded,
-                            Timeout = MaximumUiWaitTimeoutMs
-                        });
+                    await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
+                    var navigationTimeout = Math.Max(
+                        1,
+                        MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                    await _page.WaitForLoadStateAsync(
+                        LoadState.DOMContentLoaded,
+                        new() { Timeout = navigationTimeout });
                 }
                 catch (TimeoutException ex)
                 {
