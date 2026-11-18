@@ -118,28 +118,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator ThActivatedOn => _page.Locator("//th[@aria-controls='tblParentAccountSetup' and normalize-space()='Activated On']");
 
 
-        //Survey Popup
-        // Popup root
-        private ILocator SurveyPopup => _page.Locator("//div[contains(@class,'modal-content') and contains(@class,'survey-modal-content')]");
-
         // X (Remind me later) button
         private ILocator SurveyCloseButton => _page.Locator("//a[contains(@class,'md-close') and @data-dismiss='modal']");
-        //Reactivate popup
+        private ILocator ReactivatedPopup => _page.Locator(
+            "//div[contains(@class,'modal-content') and contains(@class,'survey-modal-content') and contains(.,'Your MattMoney Account is now in Active')]");
         private ILocator ReactivatedCloseIcon =>
-     _page.Locator("(//a[contains(@class,'uc-under-construction-x')])[2]");
+            ReactivatedPopup.Locator(".//a[contains(@class,'uc-under-construction-x')]");
 
         // ================= LOCATORS (All XPaths Here) =================
 
         private ILocator DashboardSection => _page.Locator("//*[@id='sec-slider']/div");
 
         private ILocator MaintenancePopup =>
-            _page.Locator("//div[contains(@class,'survey-modal-content')]");
+            _page.Locator(
+                "//div[contains(@class,'modal-content') and contains(@class,'survey-modal-content') and contains(.,'Scheduled Unavailability')]");
 
         private ILocator PopupCloseXButton =>
-            _page.Locator("//a[contains(@class,'uc-under-construction-x')]");
+            MaintenancePopup.Locator(".//a[contains(@class,'uc-under-construction-x')]");
 
         private ILocator PopupCloseButton =>
-            _page.Locator("//button[text()='CLOSE']");
+            MaintenancePopup.Locator(".//button[normalize-space()='CLOSE']");
 
       
         /* Timeout Methods
@@ -234,64 +232,63 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             try
             {
-                if (await SurveyPopup.IsVisibleAsync(new LocatorIsVisibleOptions { Timeout = 8000 }))
-                {
-                    await SurveyCloseButton.ClickAsync();
-                }
+                await SurveyCloseButton.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible, Timeout = 1000 });
             }
-            catch (PlaywrightException)
+            catch (TimeoutException)
             {
-                // Popup not present – safely ignore
+                return;
             }
+
+            await SurveyCloseButton.ClickAsync();
         }
 
         public async Task HandleMMMaintenancePopupIfPresentAsync()
         {
             try
             {
-                // Check if popup appears within 3 seconds
-                if (await MaintenancePopup.IsVisibleAsync(new() { Timeout = 8000 }))
-                {
-                    Console.WriteLine("MattMoney Maintenance popup detected.");
-
-                    if (await PopupCloseXButton.IsVisibleAsync())
-                    {
-                        await PopupCloseXButton.ClickAsync();
-                    }
-                    else if (await PopupCloseButton.IsVisibleAsync())
-                    {
-                        await PopupCloseButton.ClickAsync();
-                    }
-
-                    Console.WriteLine("Popup closed successfully.");
-                }
-                else
-                {
-                    Console.WriteLine("No MattMoney maintenance popup appeared.");
-                }
+                await MaintenancePopup.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible, Timeout = 1000 });
             }
             catch (TimeoutException)
             {
-                Console.WriteLine("MM Popup not displayed. Continuing...");
+                Console.WriteLine("No MattMoney maintenance popup appeared.");
+                return;
             }
+
+            Console.WriteLine("MattMoney Maintenance popup detected.");
+            if (await PopupCloseXButton.IsVisibleAsync())
+            {
+                await PopupCloseXButton.ClickAsync();
+            }
+            else if (await PopupCloseButton.IsVisibleAsync())
+            {
+                await PopupCloseButton.ClickAsync();
+            }
+            else
+            {
+                throw new InvalidOperationException("The maintenance popup is visible but has no close control.");
+            }
+
+            Console.WriteLine("Popup closed successfully.");
         }
 
         public async Task HandleMMReactivatedPopupIfPresentAsync()
         {
             try
             {
-                await ReactivatedCloseIcon.WaitForAsync(
+                await ReactivatedPopup.WaitForAsync(
                     new() { State = WaitForSelectorState.Visible, Timeout = 3000 });
-                Console.WriteLine("MattMoney Reactivated popup detected.");
-
-                await ReactivatedCloseIcon.ClickAsync();
-
-                Console.WriteLine("Reactivated popup closed successfully.");
             }
             catch (TimeoutException)
             {
                 Console.WriteLine("MM Reactivated popup not displayed. Continuing...");
+                return;
             }
+
+            Console.WriteLine("MattMoney Reactivated popup detected.");
+            await ReactivatedCloseIcon.ClickAsync();
+            Console.WriteLine("Reactivated popup closed successfully.");
         }
 
         //public async Task<bool> VerifyAdminDashboardAsync()
@@ -347,7 +344,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // 🔹 Try to close survey popup if it appears
                 try
                 {
-                    await SurveyPopup.WaitForAsync(
+                    await SurveyCloseButton.WaitForAsync(
                         new() { State = WaitForSelectorState.Visible, Timeout = 3000 });
                     Console.WriteLine("Survey popup appeared. Closing it.");
                     await SurveyCloseButton.ClickAsync();
