@@ -23,7 +23,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
     {
         private const int InitialUiWaitTimeoutMs = 30000;
         private const int MaximumUiWaitTimeoutMs = 180000;
-        private const int Report911RangeYears = 3;
+        private const int Report911RangeYears = 1;
 
         private IPage _page;
         private WaitHelper waitHelper;
