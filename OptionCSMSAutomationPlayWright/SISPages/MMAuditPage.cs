@@ -1099,7 +1099,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             else
             {
-                await Btn911Filter.ClickAsync();
+                // The report submit navigates slowly; wait for its result below instead of the full load event.
+                await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
                 await WaitForLoadingOverlayToDisappearAsync(300000);
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 }); // Wait until the table is visible
             }
