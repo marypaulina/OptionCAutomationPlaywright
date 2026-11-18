@@ -35,7 +35,7 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public ParishPage(IPage page, WaitHelper waitHelper) : base(page)
         {
             _page = page;
-            _page.SetDefaultTimeout(100000);
+            _page.SetDefaultTimeout(30000);
             this.waitHelper = waitHelper;
         }
 
@@ -197,8 +197,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
                 // Capture new tab
                 var newPage = await pageTask;
 
-                // Wait for usable state instead of full load
-                await newPage.WaitForTimeoutAsync(3000);
+                await newPage.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+                newPage.SetDefaultTimeout(30000);
 
                 LogToFile("New tab loaded");
 
@@ -445,7 +445,6 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task EnterAcutisParishCredentialsAsync(string Username, string Password)
         {
            LogToFile("Performing Acutis Parish Login...", true);
-            await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 300000 });
             await TxtAcutisUserName.FillAsync(Username);
             await TxtAcutisPassword.FillAsync(Password);
             await BtnAcutisLogin.ClickAsync();
@@ -455,11 +454,10 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
        
         public async Task NavigateToRecentTicketsAsync()
         {
-            await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
             await TicketsMenu.ClickAsync();
-            await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+            await RecentTicketsMenu.WaitForAsync(new() { State = WaitForSelectorState.Visible });
             await RecentTicketsMenu.ClickAsync();
-            await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+            await _page.Locator("#tblBilling").WaitForAsync(new() { State = WaitForSelectorState.Visible });
         }
         // ✅ Verify total ticket count
         public async Task VerifyParishTicketsAsync()

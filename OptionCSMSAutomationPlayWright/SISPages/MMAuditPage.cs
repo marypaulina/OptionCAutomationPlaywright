@@ -29,7 +29,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public MMAuditPages(IPage page, WaitHelper waitHelper) : base(page)
         {         
             _page = page;
-            _page.SetDefaultTimeout(100000);
+            _page.SetDefaultTimeout(30000);
             this.waitHelper = waitHelper;
             path = Path.Combine(directoryPath, "Audit Summary.txt");
 
@@ -207,11 +207,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await _page.CloseAsync(); // Close the current page only if it's still open
             }
             _page = newPage; // Update _page to reference the new page
+            _page.SetDefaultTimeout(30000);
 
             await MaxWindow();
 
             await _page.BringToFrontAsync(); // Bring the new page to the front
-            await VerifyAdminDashboardAsync(); // Verify that the admin dashboard is displayed
+            if (!await VerifyAdminDashboardAsync())
+            {
+                throw new InvalidOperationException("The admin dashboard did not become ready.");
+            }
         }
 
         // To navigate back to the Acutis domain
@@ -334,7 +338,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             {             
                 // Wait for the admin dashboard section to be visible
                 var dashboardLocator = _page.Locator("//*[@id='sec-slider']/div");
-                await dashboardLocator.WaitForAsync();           
+                await dashboardLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible });
 
                 // Check if the admin dashboard element is enabled
                 bool isDashboardEnabled = await AdminDashboard.IsEnabledAsync();
@@ -345,7 +349,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }
 
                 Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
-                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                await WaitForLoadingOverlayToDisappearAsync();
 
                 // 🔹 Try to close survey popup if it appears
                 try
@@ -388,18 +392,24 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in VerifyAdminDashboardAsync: {ex.Message}");
-                return false;
+                throw;
             }
         }
+
+        private async Task WaitForLoadingOverlayToDisappearAsync(int timeout = 30000)
+        {
+            // Wait for the application's blocking overlay, not general network-idle state.
+            await _page.Locator(".loaderimg_align:visible")
+                .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = timeout });
+        }
+
 
 
         // This method navigates to the Fee Management section
         public async Task NavigateToFeeManagementAsync()
         {
-            // Wait for the Administration menu to be visible and click it
-            //await AdministrationMenu.First.WaitForAsync();
-            await _page.WaitForTimeoutAsync(1000);
-            await AdministrationMenu.First.ClickAsync(new() { Timeout = 2000 });
+            await WaitForLoadingOverlayToDisappearAsync();
+            await AdministrationMenu.First.ClickAsync();
 
             // Wait for the Fee Management menu to be visible and click it
             await FeeManagementMenu.WaitForAsync();
@@ -419,8 +429,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             Console.WriteLine("Fee Reports page is opened");
             // Click on the Fee Reports page
             await FeeReports.ClickAsync();
-            await Task.Delay(1000);
+            await FeeReportsSearch.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         }
+
 
         // This method verifies whether the Fee Management dashboard is displayed
         public async Task<(bool, long)> SearchFeeReportAsync(long reportId, IPage page)
@@ -450,9 +461,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
 
             Console.WriteLine($"{reportId} report is searched");
+            // The report opens in a new tab; await its DOM instead of sleeping for a fixed duration.
+            var reportPageTask = _page.Context.WaitForPageAsync();
             await FeeReportsFirst.ClickAsync();
+            var reportPage = await reportPageTask;
+            await reportPage.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
             await MaxWindow();
-            await Task.Delay(1000);
             return (true, reportId);
         }
         
@@ -690,6 +704,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     _page = _page.Context.Pages.LastOrDefault()
                         ?? throw new Exception("Failed to switch to the last opened page.");
 
+                    _page.SetDefaultTimeout(30000);
                     await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
                 }
 
@@ -722,6 +737,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     await runReportLocator.IsEnabledAsync())
                 {
                     await BtnRunReport.ClickAsync();
+                    await WaitForLoadingOverlayToDisappearAsync();
                 }
                 else
                 {
@@ -738,8 +754,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 // Display all records
                 await RecordLength.SelectOptionAsync("-1");
-
-                await _page.WaitForTimeoutAsync(2000);
+                await WaitForLoadingOverlayToDisappearAsync();
 
                 // --------------------------------------------------
                 // 1. TOTAL PRIMARY ACCOUNTS
@@ -778,21 +793,19 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
 
                     Console.WriteLine("Run Report clicked for Account Created.");
+                    await WaitForLoadingOverlayToDisappearAsync();
                 }
                 else
                 {
                     throw new Exception("Run Report button is disabled for Account Created.");
                 }
 
-                await _page.WaitForTimeoutAsync(2000);
-
                 // Display all records again
                 if (await RecordLength.IsVisibleAsync())
                 {
                     await RecordLength.SelectOptionAsync("-1");
                 }
-
-                await _page.WaitForTimeoutAsync(1000);
+                await WaitForLoadingOverlayToDisappearAsync();
 
                 // Fetch Account Created row count
                 var totalAccountsCreated = await _page.Locator(
@@ -898,6 +911,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
 
                     LogToFile("Run Report clicked for Account History.");
+                    await WaitForLoadingOverlayToDisappearAsync();
                 }
                 else
                 {
@@ -912,8 +926,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         Timeout = 30000
                     });
 
-                await _page.WaitForTimeoutAsync(1500);
-
                 // Display all Account History records
                 if (await RecordLength.IsVisibleAsync())
                 {
@@ -921,8 +933,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                     LogToFile("Account History Record Length set to All.");
                 }
-
-                await _page.WaitForTimeoutAsync(1500);
+                await WaitForLoadingOverlayToDisappearAsync();
 
                 // Sort Activated On column in descending order
                 var sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
@@ -931,16 +942,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 {
                     await ThActivatedOn.ClickAsync();
 
-                    await _page.WaitForTimeoutAsync(1000);
-
                     sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
 
                     // If first click sorts ascending, click again for descending
                     if (sortOrder != "descending")
                     {
                         await ThActivatedOn.ClickAsync();
-
-                        await _page.WaitForTimeoutAsync(1000);
                     }
                 }
 
@@ -1084,7 +1091,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             var reportData = new ReportData();
             string getTransactionAmt = "0.00";
-            await Task.Delay(3000);
             // Get all open pages
             var allPages = _page.Context.Pages;
 
@@ -1103,6 +1109,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             // Update _page to reference the last page
             _page = lastPage;
+            _page.SetDefaultTimeout(30000);
             await _page.BringToFrontAsync(); // Bring the last page to the front
 
             if (ReportId != 911)
@@ -1136,12 +1143,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             {
                 //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
                 await BtnFilter.ClickAsync(new() { Timeout = 20000 });
-                await Task.Delay(5000);
+                await WaitForLoadingOverlayToDisappearAsync(300000);
             }
             else
             {
-                await Btn911Filter.ClickAsync(new() { Timeout = 300000 }); // Click with timeout
-                await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 300000 }); // Wait until network requests complete
+                await Btn911Filter.ClickAsync();
+                await WaitForLoadingOverlayToDisappearAsync(300000);
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 }); // Wait until the table is visible
             }
             // Wait for the table to load
@@ -1156,7 +1163,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             else
             {
                 await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-                await _page.WaitForTimeoutAsync(10000);  // Artificial delay (consider replacing with event-based waiting)
                 tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
             string totalValue = "0.00";
@@ -1478,7 +1484,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await _page.ClickAsync(ddlSelector);
             await _page.ClickAsync(optionSelector);
             await _page.ClickAsync(filterButtonSelector);
-            await _page.WaitForTimeoutAsync(3000);
+            await WaitForLoadingOverlayToDisappearAsync();
         }
 
         // Retrieves the payment amount from the ledger
@@ -1516,9 +1522,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             LedgerPayments ledgerPayments = new LedgerPayments();
             // Wait for the alumni disabled user checkbox and click it
             await ChkAlumniDisableduser.WaitForAsync();
-            await Task.Delay(2000); // Explicit wait
             await ChkAlumniDisableduser.ClickAsync();
-            await Task.Delay(5000); // Explicit wait
+            await WaitForLoadingOverlayToDisappearAsync();
             await TxtReference.ClearAsync();
             // Get today's and yesterday's date
             DateTime today = DateTime.Today;
@@ -1531,7 +1536,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Grab the visible calendar
             var dpRoot = _page.Locator("div.datepicker-days:visible");
             //await dpRoot.WaitForAsync();
-            await dpRoot.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 });
+            await dpRoot.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30000 });
 
             // Controls within that calendar
             var header = dpRoot.Locator("th.datepicker-switch");
@@ -1549,13 +1554,21 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (shownMonth.Year == targetMonth.Year && shownMonth.Month == targetMonth.Month)
                     break;
 
+                var nextMonth = shownMonth > targetMonth
+                    ? shownMonth.AddMonths(-1)
+                    : shownMonth.AddMonths(1);
+
                 if (shownMonth > targetMonth)
                     await prevBtn.ClickAsync();
                 else
                     await nextBtn.ClickAsync();
 
-                // small, reliable wait for the header to update
-                await header.WaitForAsync();
+                // Wait for the datepicker to render the next month before checking it again.
+                await _page.WaitForFunctionAsync(
+                    "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
+                    ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
+                    nextMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
+                    new() { Timeout = 5000 });
                 if (++guard > 24) throw new Exception("Could not navigate datepicker to the target month.");
             }
 
@@ -1594,12 +1607,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             // Click on the Ledger Filter button
         
-            await BtnLedgerFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 });
+            await BtnLedgerFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
            
             await BtnLedgerFilter.ClickAsync();
-            await Task.Delay(4000); // Wait for the table to load
+            await WaitForLoadingOverlayToDisappearAsync();
             // Wait for the ledger table to be present
-            var ledgerTable = await _page.Locator("#tblLedger").IsVisibleAsync();
+            var ledgerTableLocator = _page.Locator("#tblLedger");
+            await ledgerTableLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            var ledgerTable = await ledgerTableLocator.IsVisibleAsync();
             if (!ledgerTable)
             {
                 Console.WriteLine("Ledger table not found.");
@@ -1750,7 +1765,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await SelectCreditCard.ClickAsync();
                 await BtnLedgerFilter.WaitForAsync();
                 await BtnLedgerFilter.ClickAsync();
-                await Task.Delay(3000);
+                await WaitForLoadingOverlayToDisappearAsync();
                 bool isLedgerRowsExistCheck = (await _page.QuerySelectorAsync("//*[@id='tblLedger_wrapper']/div[2]/div/div[3]/div/table/tfoot/tr[1]/td[1]")) != null;
                 if (isLedgerRowsExistCheck)
                 {
@@ -1789,9 +1804,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task<DashboardAmount> VerifySchoolMMDashboardAsync(string startDate)
         {
             DashboardAmount dashboardAmount = new DashboardAmount();
-            await Task.Delay(2000);
             //await _page.Locator("#tabMMDashboard").WaitForAsync();
-            await TabMMDashboard.WaitForAsync(new() { Timeout = 100000 });
+            await TabMMDashboard.WaitForAsync(new() { State = WaitForSelectorState.Visible });
             await _page.EvaluateAsync("window.scrollTo(0,0);");
             //await _page.Locator("#tabMMDashboard").ClickAsync();
             await TabMMDashboard.ClickAsync();
@@ -1809,6 +1823,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             int targetDay = dateToSelect.Day;
             int targetMonth = dateToSelect.Month;
             int targetYear = dateToSelect.Year;
+            int monthNavigationAttempts = 0;
+            var monthHeader = _page.Locator(
+                "//div[contains(@class,'datepicker-days')]//th[@class='datepicker-switch']").First;
 
             // Open the calendar
             await TxtStartDate.ClickAsync();
@@ -1816,11 +1833,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Navigate calendar to correct month/year
             while (true)
             {
-                var displayedMonthYear = await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='datepicker-switch']").First.TextContentAsync();
+                var displayedMonthYear = await monthHeader.TextContentAsync() ?? string.Empty;
                 DateTime displayedDate = DateTime.ParseExact(displayedMonthYear, "MMMM yyyy", CultureInfo.InvariantCulture);
 
                 if (displayedDate.Month == targetMonth && displayedDate.Year == targetYear)
                     break;
+
+                var nextMonth = displayedDate < dateToSelect
+                    ? displayedDate.AddMonths(1)
+                    : displayedDate.AddMonths(-1);
 
                 if (displayedDate < dateToSelect)
                 {
@@ -1831,7 +1852,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='prev']").First.ClickAsync();
                 }
 
-                await Task.Delay(300); // wait briefly for calendar to update
+                // Wait for the datepicker to render the next month before checking it again.
+                await _page.WaitForFunctionAsync(
+                    "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
+                    ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
+                    nextMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
+                    new() { Timeout = 5000 });
+
+                if (++monthNavigationAttempts > 120)
+                    throw new InvalidOperationException("Could not navigate datepicker to the target month.");
             }
 
             // Click on the target day
@@ -1853,7 +1882,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await TxtEndDate.PressAsync("Tab");
             await BtnCustomFilter.WaitForAsync();
             await BtnCustomFilter.ClickAsync();
-            await _page.WaitForTimeoutAsync(10000); // Instead of Thread.Sleep
+            await WaitForLoadingOverlayToDisappearAsync(120000);
             string CCTotAmt = "0";
             string eCheckTotAmt = "0";
             decimal TotalAmount = 0;
