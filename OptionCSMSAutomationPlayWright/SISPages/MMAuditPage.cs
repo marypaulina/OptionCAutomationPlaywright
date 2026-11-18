@@ -280,19 +280,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             try
             {
-                // Check if close icon appears within 3 seconds
-                if (await ReactivatedCloseIcon.IsVisibleAsync(new() { Timeout = 8000 }))
-                {
-                    Console.WriteLine("MattMoney Reactivated popup detected.");
+                await ReactivatedCloseIcon.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible, Timeout = 3000 });
+                Console.WriteLine("MattMoney Reactivated popup detected.");
 
-                    await ReactivatedCloseIcon.ClickAsync();
+                await ReactivatedCloseIcon.ClickAsync();
 
-                    Console.WriteLine("Reactivated popup closed successfully.");
-                }
-                else
-                {
-                    Console.WriteLine("No MattMoney Reactivated popup appeared.");
-                }
+                Console.WriteLine("Reactivated popup closed successfully.");
             }
             catch (TimeoutException)
             {
@@ -349,28 +343,18 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }
 
                 Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
-                await WaitForLoadingOverlayToDisappearAsync();
 
                 // 🔹 Try to close survey popup if it appears
                 try
                 {
-                    bool isSurveyPopupVisible = await SurveyPopup
-                        .IsVisibleAsync(new LocatorIsVisibleOptions { Timeout = 3000 });
-
-                    if (isSurveyPopupVisible)
-                    {
-                        Console.WriteLine("Survey popup appeared. Closing it.");
-                        await SurveyCloseButton.ClickAsync();
-                    }
-                    else
-                    {
-                        Console.WriteLine("Survey popup did not appear. Proceeding further.");
-                    }
+                    await SurveyPopup.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = 3000 });
+                    Console.WriteLine("Survey popup appeared. Closing it.");
+                    await SurveyCloseButton.ClickAsync();
                 }
-                catch
+                catch (TimeoutException)
                 {
-                    // Absolutely safe fallback — continue execution
-                    Console.WriteLine("Survey popup check skipped. Proceeding further.");
+                    Console.WriteLine("Survey popup did not appear. Proceeding further.");
                 }
 
                 // Wait for school name
@@ -408,6 +392,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         // This method navigates to the Fee Management section
         public async Task NavigateToFeeManagementAsync()
         {
+            // Wait after dismissing optional popups, which can keep the loader active.
             await WaitForLoadingOverlayToDisappearAsync();
             await AdministrationMenu.First.ClickAsync();
 
