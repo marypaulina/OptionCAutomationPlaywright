@@ -23,6 +23,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
     {
         private const int InitialUiWaitTimeoutMs = 30000;
         private const int MaximumUiWaitTimeoutMs = 180000;
+        private const int Report911RangeYears = 3;
 
         private IPage _page;
         private WaitHelper waitHelper;
@@ -415,6 +416,134 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     $"waiting up to {fallbackTimeout}ms more.");
                 await locator.WaitForAsync(new() { State = state, Timeout = fallbackTimeout });
             }
+        }
+
+        private static IEnumerable<(DateTime StartDate, DateTime EndDate)> GetReport911DateRanges()
+        {
+            var rangeStart = new DateTime(2020, 1, 1);
+            var finalDate = DateTime.Today;
+
+            while (rangeStart <= finalDate)
+            {
+                var rangeEnd = rangeStart.AddYears(Report911RangeYears).AddDays(-1);
+                if (rangeEnd > finalDate)
+                    rangeEnd = finalDate;
+
+                yield return (rangeStart, rangeEnd);
+                rangeStart = rangeEnd.AddDays(1);
+            }
+        }
+
+        private static async Task SetReportDateFilterAsync(ILocator dateInput, DateTime date, string fieldName)
+        {
+            await dateInput.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+            if (!await dateInput.IsEnabledAsync() ||
+                await dateInput.GetAttributeAsync("readonly") != null)
+            {
+                throw new InvalidOperationException(
+                    $"Report 911 {fieldName} date filter is not editable.");
+            }
+
+            var inputType = await dateInput.GetAttributeAsync("type");
+            var expectedValue = string.Equals(inputType, "date", StringComparison.OrdinalIgnoreCase)
+                ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                : date.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+
+            await dateInput.FillAsync(expectedValue);
+            await dateInput.PressAsync("Tab");
+
+            var actualValue = await dateInput.InputValueAsync();
+            var acceptedFormats = new[] { "MM/dd/yyyy", "M/d/yyyy", "yyyy-MM-dd" };
+            if (!DateTime.TryParseExact(
+                    actualValue,
+                    acceptedFormats,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var actualDate)
+                || actualDate.Date != date.Date)
+            {
+                throw new InvalidOperationException(
+                    $"Could not set Report 911 {fieldName} date to {expectedValue}; " +
+                    $"the field contains '{actualValue}'.");
+            }
+        }
+
+        private async Task OpenFreshReportPageAsync(long reportId)
+        {
+            var reportListPage = _page;
+            await reportListPage.GotoAsync(
+                "https://feemanagement.optionc.com/report-list",
+                new() { Timeout = 100000 });
+
+            var (reportFound, _) = await SearchFeeReportAsync(reportId, reportListPage);
+            if (!reportFound)
+                throw new InvalidOperationException($"Could not open fee report {reportId} for the next date range.");
+
+            var reportPage = reportListPage.Context.Pages.LastOrDefault(
+                page => !ReferenceEquals(page, reportListPage) && !page.IsClosed);
+            if (reportPage == null)
+                throw new InvalidOperationException($"Opening fee report {reportId} did not create a report page.");
+
+            await reportListPage.CloseAsync();
+            _page = reportPage;
+            _page.SetDefaultTimeout(30000);
+            await _page.BringToFrontAsync();
+            await MaxWindow();
+        }
+
+        private async Task<decimal> GetReport911TotalAsync()
+        {
+            if (await TransEndDateFilter.CountAsync() == 0)
+            {
+                throw new InvalidOperationException(
+                    "Report 911 does not expose an end-date filter, so its total cannot be safely split into date ranges.");
+            }
+
+            var ranges = GetReport911DateRanges().ToArray();
+            if (ranges.Length == 0)
+                throw new InvalidOperationException("No Report 911 date ranges were generated.");
+
+            decimal total = 0m;
+            for (var index = 0; index < ranges.Length; index++)
+            {
+                if (index > 0)
+                    await OpenFreshReportPageAsync(911);
+
+                var (startDate, endDate) = ranges[index];
+                await SetReportDateFilterAsync(TransStartDateFilter, startDate, "start");
+                await SetReportDateFilterAsync(TransEndDateFilter, endDate, "end");
+
+                if (!await Btn911Filter.IsEnabledAsync())
+                    throw new InvalidOperationException("Report 911 Run Report button is disabled.");
+
+                await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
+                await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
+                await WaitForLocatorWithFallbackAsync(Table911);
+                await WaitForLocatorWithFallbackAsync(Report911Value.First);
+
+                var amountText = (await Report911Value.First.InnerTextAsync()).Trim();
+                if (!decimal.TryParse(
+                        amountText,
+                        NumberStyles.Currency,
+                        CultureInfo.GetCultureInfo("en-US"),
+                        out var rangeAmount))
+                {
+                    throw new FormatException(
+                        $"Report 911 returned an invalid total for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: '{amountText}'.");
+                }
+
+                total += rangeAmount;
+                await File.AppendAllTextAsync(
+                    path,
+                    $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: {rangeAmount.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}{Environment.NewLine}");
+            }
+
+            await File.AppendAllTextAsync(
+                path,
+                $"Report 911 combined total: {total.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}{Environment.NewLine}");
+
+            return total;
         }
 
         private static bool IsDateValue(DateTime expectedDate, string actualValue)
@@ -1139,6 +1268,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     await StaffCheck.ClickAsync();
                 }
             }
+
+            if (ReportId == 911)
+            {
+                var report911Total = await GetReport911TotalAsync();
+                reportData.ReportValue = report911Total.ToString("F2", CultureInfo.CurrentCulture);
+                return reportData;
+            }
+
             // Start date filtering
             //await TransStartDateFilter.ClickAsync();
             //await TransStartDateFilter.FillAsync(DateFunction("01/01/2020")); //Day 1 mm released date
@@ -1158,32 +1295,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
 
 
-            if (ReportId != 911)
-            {
-                //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
-                await BtnFilter.ClickAsync(new() { Timeout = 20000 });
-                await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table);
-            }
-            else
-            {
-                // The report submit navigates slowly; wait for its result below instead of the full load event.
-                await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
-                await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
-            }
-            // Wait for the table to load
-            IReadOnlyList<IElementHandle> tableRows;
-            if (ReportId != 911)
-            {
-               // await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
-                await WaitForLocatorWithFallbackAsync(Table);
+            //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
+            await BtnFilter.ClickAsync(new() { Timeout = 20000 });
+            await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table);
 
-                tableRows = await _page.QuerySelectorAllAsync("//tfoot");
-            }
-            else
-            {
-                await WaitForLocatorWithFallbackAsync(Table911);
-                tableRows = await _page.QuerySelectorAllAsync("//tfoot");
-            }
+            // Wait for the table to load
+            await WaitForLocatorWithFallbackAsync(Table);
+            IReadOnlyList<IElementHandle> tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             string totalValue = "0.00";
             if (ReportId == 901 || ReportId == 904)
             {
@@ -1220,7 +1338,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             //Verify whetehr transaction amount is equal or not equal compared to Report 902 or 905
             else
             {
-                totalValue = tableRows.Count > 0 ? (ReportId != 911 ? await ReportValue.First.InnerTextAsync() : await Report911Value.First.InnerTextAsync()) : "0.00";
+                totalValue = tableRows.Count > 0 ? await ReportValue.First.InnerTextAsync() : "0.00";
 
 
 
