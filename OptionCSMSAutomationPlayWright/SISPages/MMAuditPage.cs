@@ -782,12 +782,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // 2. ACCOUNT CREATED REPORT
                 // --------------------------------------------------
 
-                if (await AccountCreatedRadio.IsVisibleAsync())
-                {
-                    await AccountCreatedRadio.ClickAsync();
+                await AccountCreatedRadio.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible });
+                await AccountCreatedRadio.ClickAsync();
 
-                    Console.WriteLine("Account Created Radio button clicked.");
-                }
+                Console.WriteLine("Account Created Radio button clicked.");
 
                 if (await BtnRunReport.IsEnabledAsync())
                 {
@@ -895,16 +894,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 LogToFile("Checking Account History - Accounts Activated in Last 24 Hours", true);
 
                 // Select Account History radio button
-                if (await RbAccountHistory.IsVisibleAsync())
-                {
-                    await RbAccountHistory.ClickAsync();
-
-                    LogToFile("Account History radio button selected.");
-                }
-                else
-                {
-                    throw new Exception("Account History radio button not found.");
-                }
+                await RbAccountHistory.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible });
+                await RbAccountHistory.ClickAsync();
+                LogToFile("Account History radio button selected.");
 
                 // Run Account History report
                 if (await BtnRunReport.IsEnabledAsync())
