@@ -459,7 +459,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 || text.Contains("no result", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static async Task SetReportDateFilterAsync(ILocator dateInput, DateTime date, string fieldName)
+        private async Task SetReportDateFilterAsync(ILocator dateInput, DateTime date, string fieldName)
         {
             await dateInput.WaitForAsync(new() { State = WaitForSelectorState.Visible });
 
@@ -475,33 +475,70 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 : date.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
-            if (string.Equals(inputType, "date", StringComparison.OrdinalIgnoreCase))
-            {
-                await dateInput.FillAsync(expectedValue);
-            }
-            else
-            {
-                await dateInput.ClickAsync();
-                await dateInput.PressAsync("Control+A");
-                await dateInput.PressAsync("Backspace");
-                await dateInput.PressSequentiallyAsync(expectedValue);
-            }
+            await dateInput.FillAsync(expectedValue);
 
             await dateInput.PressAsync("Tab");
 
             var actualValue = await dateInput.InputValueAsync();
-            var acceptedFormats = new[] { "MM/dd/yyyy", "M/d/yyyy", "yyyy-MM-dd" };
-            if (!DateTime.TryParseExact(
-                    actualValue,
-                    acceptedFormats,
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out var actualDate)
-                || actualDate.Date != date.Date)
+            if (!IsDateValue(date, actualValue))
             {
-                throw new InvalidOperationException(
-                    $"Could not set Report 911 {fieldName} date to {expectedValue}; " +
-                    $"the field contains '{actualValue}'.");
+                await dateInput.ClickAsync();
+
+                var datepicker = _page.Locator("div.datepicker-days:visible");
+                await datepicker.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
+
+                var targetMonth = new DateTime(date.Year, date.Month, 1);
+                var header = datepicker.Locator("th.datepicker-switch");
+                var previousMonth = datepicker.Locator("th.prev");
+                var nextMonth = datepicker.Locator("th.next");
+                var navigationAttempts = 0;
+
+                while (true)
+                {
+                    var displayedMonth = DateTime.ParseExact(
+                        (await header.InnerTextAsync()).Trim(),
+                        "MMMM yyyy",
+                        CultureInfo.InvariantCulture);
+                    if (displayedMonth.Year == targetMonth.Year &&
+                        displayedMonth.Month == targetMonth.Month)
+                    {
+                        break;
+                    }
+
+                    var nextDisplayedMonth = displayedMonth > targetMonth
+                        ? displayedMonth.AddMonths(-1)
+                        : displayedMonth.AddMonths(1);
+                    if (displayedMonth > targetMonth)
+                        await previousMonth.ClickAsync();
+                    else
+                        await nextMonth.ClickAsync();
+
+                    await _page.WaitForFunctionAsync(
+                        "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
+                        ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
+                        nextDisplayedMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
+                        new() { Timeout = 5000 });
+
+                    if (++navigationAttempts > 120)
+                        throw new InvalidOperationException(
+                            $"Could not navigate the Report 911 {fieldName} datepicker to {expectedValue}.");
+                }
+
+                var dayCell = datepicker.Locator(
+                    $@"td.day:not(.old):not(.new):text-is(""{date.Day}"")");
+                if (await dayCell.CountAsync() == 0)
+                    dayCell = datepicker.Locator($@"td.day:not(.disabled):text-is(""{date.Day}"")");
+                await dayCell.First.ClickAsync();
+                await dateInput.PressAsync("Tab");
+
+                actualValue = await dateInput.InputValueAsync();
+                if (!IsDateValue(date, actualValue))
+                {
+                    throw new InvalidOperationException(
+                        $"Could not set Report 911 {fieldName} date to {expectedValue}; " +
+                        $"the field contains '{actualValue}'.");
+                }
             }
         }
 
