@@ -450,7 +450,18 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 : date.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
-            await dateInput.FillAsync(expectedValue);
+            if (string.Equals(inputType, "date", StringComparison.OrdinalIgnoreCase))
+            {
+                await dateInput.FillAsync(expectedValue);
+            }
+            else
+            {
+                await dateInput.ClickAsync();
+                await dateInput.PressAsync("Control+A");
+                await dateInput.PressAsync("Backspace");
+                await dateInput.PressSequentiallyAsync(expectedValue);
+            }
+
             await dateInput.PressAsync("Tab");
 
             var actualValue = await dateInput.InputValueAsync();
