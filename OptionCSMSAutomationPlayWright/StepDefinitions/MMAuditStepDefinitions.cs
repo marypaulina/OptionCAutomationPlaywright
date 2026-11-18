@@ -41,21 +41,21 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
                 LedgerPayments ledgerPayments = new LedgerPayments();
                 DashboardAmount dashboardAmount = new DashboardAmount();
 
-                string schoolCode = auditTable.Rows[i]["SchoolCode"];
+                string schoolIdentifier = auditTable.Rows[i]["SchoolCode"];
                 string startDate = auditTable.Rows[i]["StartDate"];
-                await mmPage.OpenSchoolAsync(auditTable.Rows[i]["SchoolCode"]); // Search and open the school
+                await mmPage.OpenSchoolAsync(schoolIdentifier); // Search and open the school
                 await mmPage.HandleMMMaintenancePopupIfPresentAsync();
                 await mmPage.HandleMMReactivatedPopupIfPresentAsync();
                 await mmPage.NavigateToFeeManagementAsync(); // Navigate to Fee Management
                 Console.WriteLine("Landed in Fee Management page");
                 ledgerPayments = await mmPage.GetChargesPaymentsAsync();// Verify charges, payments posted in last 24 hrs from the ledger
                 //if (schoolCode != "3932" && schoolCode != "4291")
-                if (schoolCode != "4291" && schoolCode != "5940" && schoolCode != "8518")
+                if (schoolIdentifier != "4291" && schoolIdentifier != "5940" && schoolIdentifier != "8518")
                 {
                     dashboardAmount = await mmPage.VerifySchoolMMDashboardAsync(startDate);// Open dashboard, filter current school year, and read data
                 }
                 await mmPage.VerifyFeeManagementAsync(); // Open the Fee Management page                
-                objreport = await mmPage.LoopFilterAsync();// Loop through all MM reports and get values               
+                objreport = await mmPage.LoopFilterAsync(schoolIdentifier);// Loop through all MM reports and get values
                 await mmPage.VerifyAccountStatusAsync(objreport);// Track account status                
                 await mmPage.WriteAuditReportInExcel(objreport, ledgerPayments, dashboardAmount, i, startDate, auditTable.Rows.Count);// Write values to Excel               
                 if (auditTable.Rows.Count != i + 1)// Go back to Acutis after auditing one school

@@ -24,6 +24,29 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         private const int InitialUiWaitTimeoutMs = 30000;
         private const int MaximumUiWaitTimeoutMs = 180000;
         private const int Report911RangeYears = 1;
+        private static readonly HashSet<string> Report911SplitSchoolIdentifiers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "5158",
+            "St. Joseph Marquette Catholic School",
+            "7291",
+            "Cathedral School - Superior",
+            "221",
+            "Holy Family Classical Academy",
+            "6142",
+            "St. Francis of Assisi School-Banks",
+            "8232",
+            "John Paul II Catholic School",
+            "8507",
+            "Holy Trinity Catholic School - Assumption",
+            "8351",
+            "Immaculate Conception School - Bellevue",
+            "8958",
+            "St. Anne Catholic School - Somerset",
+            "8400",
+            "Piqua Catholic School",
+            "142",
+            "Immaculate Conception Catholic School"
+        };
 
         private IPage _page;
         private WaitHelper waitHelper;
@@ -459,15 +482,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 || text.Contains("no result", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task SetReportDateFilterAsync(ILocator dateInput, DateTime date, string fieldName)
+        private async Task SetDateInputValueAsync(ILocator dateInput, DateTime date, string fieldName)
         {
             await dateInput.WaitForAsync(new() { State = WaitForSelectorState.Visible });
 
-            if (!await dateInput.IsEnabledAsync() ||
-                await dateInput.GetAttributeAsync("readonly") != null)
+            if (!await dateInput.IsEnabledAsync())
             {
-                throw new InvalidOperationException(
-                    $"Report 911 {fieldName} date filter is not editable.");
+                throw new InvalidOperationException($"{fieldName} date field is disabled.");
             }
 
             var inputType = await dateInput.GetAttributeAsync("type");
@@ -475,71 +496,40 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 : date.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
-            await dateInput.FillAsync(expectedValue);
-
-            await dateInput.PressAsync("Tab");
-
             var actualValue = await dateInput.InputValueAsync();
+            if (await dateInput.GetAttributeAsync("readonly") == null)
+            {
+                await dateInput.FillAsync(expectedValue);
+                await dateInput.PressAsync("Tab");
+                actualValue = await dateInput.InputValueAsync();
+            }
+
             if (!IsDateValue(date, actualValue))
             {
-                await dateInput.ClickAsync();
-
-                var datepicker = _page.Locator("div.datepicker-days:visible");
-                await datepicker.WaitForAsync(
-                    new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
-
-                var targetMonth = new DateTime(date.Year, date.Month, 1);
-                var header = datepicker.Locator("th.datepicker-switch");
-                var previousMonth = datepicker.Locator("th.prev");
-                var nextMonth = datepicker.Locator("th.next");
-                var navigationAttempts = 0;
-
-                while (true)
-                {
-                    var displayedMonth = DateTime.ParseExact(
-                        (await header.InnerTextAsync()).Trim(),
-                        "MMMM yyyy",
-                        CultureInfo.InvariantCulture);
-                    if (displayedMonth.Year == targetMonth.Year &&
-                        displayedMonth.Month == targetMonth.Month)
-                    {
-                        break;
-                    }
-
-                    var nextDisplayedMonth = displayedMonth > targetMonth
-                        ? displayedMonth.AddMonths(-1)
-                        : displayedMonth.AddMonths(1);
-                    if (displayedMonth > targetMonth)
-                        await previousMonth.ClickAsync();
-                    else
-                        await nextMonth.ClickAsync();
-
-                    await _page.WaitForFunctionAsync(
-                        "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
-                        ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
-                        nextDisplayedMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
-                        new() { Timeout = 5000 });
-
-                    if (++navigationAttempts > 120)
-                        throw new InvalidOperationException(
-                            $"Could not navigate the Report 911 {fieldName} datepicker to {expectedValue}.");
-                }
-
-                var dayCell = datepicker.Locator(
-                    $@"td.day:not(.old):not(.new):text-is(""{date.Day}"")");
-                if (await dayCell.CountAsync() == 0)
-                    dayCell = datepicker.Locator($@"td.day:not(.disabled):text-is(""{date.Day}"")");
-                await dayCell.First.ClickAsync();
-                await dateInput.PressAsync("Tab");
-
+                var datepickerUpdated = await dateInput.EvaluateAsync<bool>(
+                    @"(input, value) => {
+                        const jquery = window.jQuery;
+                        if (!jquery || !jquery.fn || typeof jquery.fn.datepicker !== 'function')
+                            return false;
+                        jquery(input).datepicker('update', value);
+                        return true;
+                    }",
+                    expectedValue);
+                if (datepickerUpdated)
+                    await dateInput.PressAsync("Tab");
                 actualValue = await dateInput.InputValueAsync();
                 if (!IsDateValue(date, actualValue))
                 {
                     throw new InvalidOperationException(
-                        $"Could not set Report 911 {fieldName} date to {expectedValue}; " +
+                        $"Could not set {fieldName} date to {expectedValue}; " +
                         $"the field contains '{actualValue}'.");
                 }
             }
+        }
+
+        private Task SetReportDateFilterAsync(ILocator dateInput, DateTime date, string fieldName)
+        {
+            return SetDateInputValueAsync(dateInput, date, $"Report 911 {fieldName}");
         }
 
         private async Task OpenFreshReportPageAsync(long reportId)
@@ -565,28 +555,38 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await MaxWindow();
         }
 
-        private async Task<decimal> GetReport911TotalAsync(StreamWriter auditWriter)
+        private async Task<decimal> GetReport911TotalAsync(StreamWriter auditWriter, string schoolIdentifier)
         {
             await TransStartDateFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
             await Btn911Filter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
 
             var endDateFilter = TransEndDateFilter.First;
-            var canSplitDateRange = await TransEndDateFilter.CountAsync() > 0
+            var hasEditableEndDateFilter = await TransEndDateFilter.CountAsync() > 0
                 && await endDateFilter.IsVisibleAsync()
                 && await endDateFilter.IsEnabledAsync()
                 && await endDateFilter.GetAttributeAsync("readonly") == null;
 
+            var shouldSplitDateRange = hasEditableEndDateFilter
+                && Report911SplitSchoolIdentifiers.Contains(schoolIdentifier.Trim());
             var firstDate = new DateTime(2020, 1, 1);
-            var ranges = canSplitDateRange
+            var ranges = shouldSplitDateRange
                 ? GetReport911DateRanges().ToArray()
                 : new[] { (StartDate: firstDate, EndDate: DateTime.Today) };
+            var rangeDescription = shouldSplitDateRange
+                ? string.Empty
+                : hasEditableEndDateFilter
+                    ? " (single query)"
+                    : " (single query; no end-date filter)";
             if (ranges.Length == 0)
                 throw new InvalidOperationException("No Report 911 date ranges were generated.");
 
-            if (!canSplitDateRange)
+            if (!shouldSplitDateRange)
             {
+                var reason = hasEditableEndDateFilter
+                    ? $"school {schoolIdentifier} is not configured for split ranges"
+                    : "there is no editable end-date filter";
                 await auditWriter.WriteLineAsync(
-                    "Report 911 has no editable end-date filter; running one unsplit query from " +
+                    $"Report 911 {reason}; running one unsplit query from " +
                     $"{firstDate:MM/dd/yyyy} through {DateTime.Today:MM/dd/yyyy}.");
                 await auditWriter.FlushAsync();
             }
@@ -599,7 +599,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 var (startDate, endDate) = ranges[index];
                 await SetReportDateFilterAsync(TransStartDateFilter, startDate, "start");
-                if (canSplitDateRange)
+                if (hasEditableEndDateFilter)
                     await SetReportDateFilterAsync(TransEndDateFilter, endDate, "end");
 
                 if (!await Btn911Filter.IsEnabledAsync())
@@ -678,7 +678,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         total += rangeAmount;
                         await auditWriter.WriteLineAsync(
                             $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
-                            $"{(canSplitDateRange ? string.Empty : " (single query; no end-date filter)")}: $0.00 (no rows)");
+                            $"{rangeDescription}: $0.00 (no rows)");
                         await auditWriter.FlushAsync();
                         continue;
                     }
@@ -705,7 +705,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 total += rangeAmount;
                 await auditWriter.WriteLineAsync(
                     $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
-                    $"{(canSplitDateRange ? string.Empty : " (single query; no end-date filter)")}: " +
+                    $"{rangeDescription}: " +
                     rangeAmount.ToString("C2", CultureInfo.GetCultureInfo("en-US")));
                 await auditWriter.FlushAsync();
             }
@@ -1394,7 +1394,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
 
         #region Report Button Filter, write the report value and compare results are matching or not
-        public async Task<ReportData> StartFilterAsync(Int64 ReportId, Report objReport, StreamWriter auditWriter)
+        public async Task<ReportData> StartFilterAsync(
+            Int64 ReportId,
+            Report objReport,
+            StreamWriter auditWriter,
+            string schoolIdentifier)
         {
 
             var reportData = new ReportData();
@@ -1423,7 +1427,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             if (ReportId == 911)
             {
-                var report911Total = await GetReport911TotalAsync(auditWriter);
+                var report911Total = await GetReport911TotalAsync(auditWriter, schoolIdentifier);
                 reportData.ReportValue = report911Total.ToString("F2", CultureInfo.CurrentCulture);
                 return reportData;
             }
@@ -1514,7 +1518,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         #endregion
 
         #region Loop all the MM Reports, Read and Write amounts
-        public async Task<Report> LoopFilterAsync()
+        public async Task<Report> LoopFilterAsync(string schoolIdentifier)
         {
             Int64[] reportIds = new Int64[5] { 911, 901, 904, 902, 905 };
             Report objReport = new Report();
@@ -1532,7 +1536,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                         await SearchFeeReportAsync(reportId, _page);
                         await MaxWindow();
-                        ReportData reportData = await StartFilterAsync(reportId, objReport, writer);
+                        ReportData reportData = await StartFilterAsync(
+                            reportId,
+                            objReport,
+                            writer,
+                            schoolIdentifier);
 
                         switch (reportId)
                         {
@@ -1820,74 +1828,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             DateTime yesterday = today.AddDays(-1);
             string startDate = yesterday.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
-            bool selectedDateMatches = false;
-            string inputType = await TxtStartDate.GetAttributeAsync("type") ?? string.Empty;
-            bool isReadOnly = await TxtStartDate.GetAttributeAsync("readonly") != null;
-
-            if (!isReadOnly && await TxtStartDate.IsEnabledAsync())
-            {
-                string inputDate = inputType.Equals("date", StringComparison.OrdinalIgnoreCase)
-                    ? yesterday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                    : startDate;
-                await TxtStartDate.FillAsync(inputDate);
-                await TxtStartDate.PressAsync("Tab");
-                selectedDateMatches = IsDateValue(yesterday, await TxtStartDate.InputValueAsync());
-            }
-
-            if (!selectedDateMatches)
-            {
-                await TxtStartDate.ClickAsync();
-
-                var dpRoot = _page.Locator("div.datepicker-days:visible");
-                await dpRoot.WaitForAsync(
-                    new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
-
-                var header = dpRoot.Locator("th.datepicker-switch");
-                var prevBtn = dpRoot.Locator("th.prev");
-                var nextBtn = dpRoot.Locator("th.next");
-                var targetMonth = new DateTime(yesterday.Year, yesterday.Month, 1);
-                int guard = 0;
-
-                while (true)
-                {
-                    string headerText = (await header.InnerTextAsync()).Trim();
-                    var shownMonth = DateTime.ParseExact(headerText, "MMMM yyyy", CultureInfo.InvariantCulture);
-
-                    if (shownMonth.Year == targetMonth.Year && shownMonth.Month == targetMonth.Month)
-                        break;
-
-                    var nextMonth = shownMonth > targetMonth
-                        ? shownMonth.AddMonths(-1)
-                        : shownMonth.AddMonths(1);
-
-                    if (shownMonth > targetMonth)
-                        await prevBtn.ClickAsync();
-                    else
-                        await nextBtn.ClickAsync();
-
-                    await _page.WaitForFunctionAsync(
-                        "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
-                        ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
-                        nextMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
-                        new() { Timeout = 5000 });
-
-                    if (++guard > 24)
-                        throw new InvalidOperationException("Could not navigate datepicker to the target month.");
-                }
-
-                int yesterdayDay = yesterday.Day;
-                var dayCell = dpRoot.Locator($@"td.day:not(.old):not(.new):text-is(""{yesterdayDay}"")");
-                if (await dayCell.CountAsync() == 0)
-                    dayCell = dpRoot.Locator($@"td.day:not(.disabled):text-is(""{yesterdayDay}"")");
-
-                await dayCell.First.ClickAsync();
-                await TxtStartDate.PressAsync("Tab");
-                selectedDateMatches = IsDateValue(yesterday, await TxtStartDate.InputValueAsync());
-            }
-
+            await SetDateInputValueAsync(TxtStartDate, yesterday, "ledger start");
             string selectedDate = await TxtStartDate.InputValueAsync();
-            if (!selectedDateMatches)
-                throw new InvalidOperationException($"Unable to set ledger start date to {startDate}; the field contains '{selectedDate}'.");
 
             Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
 
@@ -2124,51 +2066,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             // Parse the passed startDate string
             DateTime dateToSelect = DateTime.ParseExact(startDate, "MM/dd/yyyy", CultureInfo.InvariantCulture);
-            int targetDay = dateToSelect.Day;
-            int targetMonth = dateToSelect.Month;
-            int targetYear = dateToSelect.Year;
-            int monthNavigationAttempts = 0;
-            var monthHeader = _page.Locator(
-                "//div[contains(@class,'datepicker-days')]//th[@class='datepicker-switch']").First;
-
-            // Open the calendar
-            await TxtStartDate.ClickAsync();
-
-            // Navigate calendar to correct month/year
-            while (true)
-            {
-                var displayedMonthYear = await monthHeader.TextContentAsync() ?? string.Empty;
-                DateTime displayedDate = DateTime.ParseExact(displayedMonthYear, "MMMM yyyy", CultureInfo.InvariantCulture);
-
-                if (displayedDate.Month == targetMonth && displayedDate.Year == targetYear)
-                    break;
-
-                var nextMonth = displayedDate < dateToSelect
-                    ? displayedDate.AddMonths(1)
-                    : displayedDate.AddMonths(-1);
-
-                if (displayedDate < dateToSelect)
-                {
-                    await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='next']").First.ClickAsync();
-                }
-                else
-                {
-                    await _page.Locator("//div[contains(@class,'datepicker-days')]//th[@class='prev']").First.ClickAsync();
-                }
-
-                // Wait for the datepicker to render the next month before checking it again.
-                await _page.WaitForFunctionAsync(
-                    "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
-                    ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
-                    nextMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
-                    new() { Timeout = 5000 });
-
-                if (++monthNavigationAttempts > 120)
-                    throw new InvalidOperationException("Could not navigate datepicker to the target month.");
-            }
-
-            // Click on the target day
-            await _page.Locator($"//div[contains(@class,'datepicker-days')]//td[contains(@class,'day') and not(contains(@class,'old')) and not(contains(@class,'new')) and text()='{targetDay}']").First.ClickAsync();
+            await SetDateInputValueAsync(TxtStartDate, dateToSelect, "dashboard start");
 
             #endregion
             // Wait for next element
