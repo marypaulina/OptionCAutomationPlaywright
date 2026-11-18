@@ -21,6 +21,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 {
     public class MMAuditPages : BasePageObject
     {
+        private const int InitialUiWaitTimeoutMs = 30000;
+        private const int MaximumUiWaitTimeoutMs = 180000;
+
         private IPage _page;
         private WaitHelper waitHelper;
         private readonly string directoryPath = "D:\\File";
@@ -343,11 +346,75 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
         }
 
-        private async Task WaitForLoadingOverlayToDisappearAsync(int timeout = 30000)
+        private async Task WaitForLoadingOverlayToDisappearAsync(
+            int timeout = MaximumUiWaitTimeoutMs,
+            ILocator? readyLocator = null)
         {
-            // Wait for the application's blocking overlay, not general network-idle state.
-            await _page.Locator(".loaderimg_align:visible")
-                .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = timeout });
+            if (timeout <= 0)
+                throw new ArgumentOutOfRangeException(nameof(timeout), "Wait timeout must be greater than zero.");
+
+            var boundedTimeout = Math.Min(timeout, MaximumUiWaitTimeoutMs);
+            var initialTimeout = Math.Min(InitialUiWaitTimeoutMs, boundedTimeout);
+            var overlay = _page.Locator(".loaderimg_align:visible");
+
+            try
+            {
+                await overlay.WaitForAsync(
+                    new() { State = WaitForSelectorState.Hidden, Timeout = initialTimeout });
+            }
+            catch (TimeoutException) when (boundedTimeout > initialTimeout)
+            {
+                var fallbackTimeout = boundedTimeout - initialTimeout;
+                Console.WriteLine(
+                    $"Loading overlay is still visible after {initialTimeout}ms; " +
+                    $"waiting up to {fallbackTimeout}ms for the page to become ready.");
+
+                if (readyLocator != null)
+                {
+                    try
+                    {
+                        await readyLocator.WaitForAsync(
+                            new() { State = WaitForSelectorState.Visible, Timeout = fallbackTimeout });
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        throw new TimeoutException(
+                            $"The loading overlay remained visible and the expected page content " +
+                            $"did not appear within {boundedTimeout}ms.",
+                            ex);
+                    }
+
+                    return;
+                }
+
+                await overlay.WaitForAsync(
+                    new() { State = WaitForSelectorState.Hidden, Timeout = fallbackTimeout });
+            }
+        }
+
+        private static async Task WaitForLocatorWithFallbackAsync(
+            ILocator locator,
+            WaitForSelectorState state = WaitForSelectorState.Visible,
+            int timeout = MaximumUiWaitTimeoutMs)
+        {
+            if (timeout <= 0)
+                throw new ArgumentOutOfRangeException(nameof(timeout), "Wait timeout must be greater than zero.");
+
+            var boundedTimeout = Math.Min(timeout, MaximumUiWaitTimeoutMs);
+            var initialTimeout = Math.Min(InitialUiWaitTimeoutMs, boundedTimeout);
+
+            try
+            {
+                await locator.WaitForAsync(new() { State = state, Timeout = initialTimeout });
+            }
+            catch (TimeoutException) when (boundedTimeout > initialTimeout)
+            {
+                var fallbackTimeout = boundedTimeout - initialTimeout;
+                Console.WriteLine(
+                    $"Page content was not ready after {initialTimeout}ms; " +
+                    $"waiting up to {fallbackTimeout}ms more.");
+                await locator.WaitForAsync(new() { State = state, Timeout = fallbackTimeout });
+            }
         }
 
         private static bool IsDateValue(DateTime expectedDate, string actualValue)
@@ -1095,27 +1162,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             {
                 //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
                 await BtnFilter.ClickAsync(new() { Timeout = 20000 });
-                await WaitForLoadingOverlayToDisappearAsync(300000);
+                await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table);
             }
             else
             {
                 // The report submit navigates slowly; wait for its result below instead of the full load event.
                 await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
-                await WaitForLoadingOverlayToDisappearAsync(300000);
-                await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 300000 }); // Wait until the table is visible
+                await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
             }
             // Wait for the table to load
             IReadOnlyList<IElementHandle> tableRows;
             if (ReportId != 911)
             {
                // await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { State = WaitForSelectorState.Visible });
-                await _page.WaitForSelectorAsync("//*[@id='DataTables_Table_0']", new() { Timeout = 300000, State = WaitForSelectorState.Visible });
+                await WaitForLocatorWithFallbackAsync(Table);
 
                 tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
             else
             {
-                await Table911.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+                await WaitForLocatorWithFallbackAsync(Table911);
                 tableRows = await _page.QuerySelectorAllAsync("//tfoot");
             }
             string totalValue = "0.00";
@@ -1577,9 +1643,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await BtnLedgerFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
            
             await BtnLedgerFilter.ClickAsync();
-            await WaitForLoadingOverlayToDisappearAsync();
             // Wait for the ledger table to be present
             var ledgerTableLocator = _page.Locator("#tblLedger");
+            await WaitForLoadingOverlayToDisappearAsync();
             await ledgerTableLocator.WaitForAsync(new() { State = WaitForSelectorState.Visible });
             var ledgerTable = await ledgerTableLocator.IsVisibleAsync();
             if (!ledgerTable)
@@ -1849,7 +1915,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await TxtEndDate.PressAsync("Tab");
             await BtnCustomFilter.WaitForAsync();
             await BtnCustomFilter.ClickAsync();
-            await WaitForLoadingOverlayToDisappearAsync(120000);
+            await WaitForLoadingOverlayToDisappearAsync();
             string CCTotAmt = "0";
             string eCheckTotAmt = "0";
             decimal TotalAmount = 0;
