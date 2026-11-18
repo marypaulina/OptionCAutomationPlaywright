@@ -515,15 +515,29 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         private async Task<decimal> GetReport911TotalAsync(StreamWriter auditWriter)
         {
-            if (await TransEndDateFilter.CountAsync() == 0)
-            {
-                throw new InvalidOperationException(
-                    "Report 911 does not expose an end-date filter, so its total cannot be safely split into date ranges.");
-            }
+            await TransStartDateFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await Btn911Filter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
 
-            var ranges = GetReport911DateRanges().ToArray();
+            var endDateFilter = TransEndDateFilter.First;
+            var canSplitDateRange = await TransEndDateFilter.CountAsync() > 0
+                && await endDateFilter.IsVisibleAsync()
+                && await endDateFilter.IsEnabledAsync()
+                && await endDateFilter.GetAttributeAsync("readonly") == null;
+
+            var firstDate = new DateTime(2020, 1, 1);
+            var ranges = canSplitDateRange
+                ? GetReport911DateRanges().ToArray()
+                : new[] { (StartDate: firstDate, EndDate: DateTime.Today) };
             if (ranges.Length == 0)
                 throw new InvalidOperationException("No Report 911 date ranges were generated.");
+
+            if (!canSplitDateRange)
+            {
+                await auditWriter.WriteLineAsync(
+                    "Report 911 has no editable end-date filter; running one unsplit query from " +
+                    $"{firstDate:MM/dd/yyyy} through {DateTime.Today:MM/dd/yyyy}.");
+                await auditWriter.FlushAsync();
+            }
 
             decimal total = 0m;
             for (var index = 0; index < ranges.Length; index++)
@@ -533,7 +547,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 var (startDate, endDate) = ranges[index];
                 await SetReportDateFilterAsync(TransStartDateFilter, startDate, "start");
-                await SetReportDateFilterAsync(TransEndDateFilter, endDate, "end");
+                if (canSplitDateRange)
+                    await SetReportDateFilterAsync(TransEndDateFilter, endDate, "end");
 
                 if (!await Btn911Filter.IsEnabledAsync())
                     throw new InvalidOperationException("Report 911 Run Report button is disabled.");
@@ -582,7 +597,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         rangeAmount = 0m;
                         total += rangeAmount;
                         await auditWriter.WriteLineAsync(
-                            $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: $0.00 (no rows)");
+                            $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
+                            $"{(canSplitDateRange ? string.Empty : " (single query; no end-date filter)")}: $0.00 (no rows)");
                         await auditWriter.FlushAsync();
                         continue;
                     }
@@ -608,7 +624,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 total += rangeAmount;
                 await auditWriter.WriteLineAsync(
-                    $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: {rangeAmount.ToString("C2", CultureInfo.GetCultureInfo("en-US"))}");
+                    $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
+                    $"{(canSplitDateRange ? string.Empty : " (single query; no end-date filter)")}: " +
+                    rangeAmount.ToString("C2", CultureInfo.GetCultureInfo("en-US")));
                 await auditWriter.FlushAsync();
             }
 
