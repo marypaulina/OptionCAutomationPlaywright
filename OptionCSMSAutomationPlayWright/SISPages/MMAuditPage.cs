@@ -350,6 +350,16 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = timeout });
         }
 
+        private static bool IsDateValue(DateTime expectedDate, string actualValue)
+        {
+            return DateTime.TryParse(
+                       actualValue,
+                       CultureInfo.InvariantCulture,
+                       DateTimeStyles.None,
+                       out var parsedDate)
+                   && parsedDate.Date == expectedDate.Date;
+        }
+
 
 
         // This method navigates to the Fee Management section
@@ -1472,61 +1482,75 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             DateTime yesterday = today.AddDays(-1);
             string startDate = yesterday.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
-            // Open the calendar by clicking start date input
-            await TxtStartDate.ClickAsync();
+            bool selectedDateMatches = false;
+            string inputType = await TxtStartDate.GetAttributeAsync("type") ?? string.Empty;
+            bool isReadOnly = await TxtStartDate.GetAttributeAsync("readonly") != null;
 
-            // Grab the visible calendar
-            var dpRoot = _page.Locator("div.datepicker-days:visible");
-            //await dpRoot.WaitForAsync();
-            await dpRoot.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30000 });
-
-            // Controls within that calendar
-            var header = dpRoot.Locator("th.datepicker-switch");
-            var prevBtn = dpRoot.Locator("th.prev");
-            var nextBtn = dpRoot.Locator("th.next");
-
-            // Navigate to the month that contains 'yesterday'
-            var targetMonth = new DateTime(yesterday.Year, yesterday.Month, 1);
-            int guard = 0;
-            while (true)
+            if (!isReadOnly && await TxtStartDate.IsEnabledAsync())
             {
-                string headerText = (await header.InnerTextAsync()).Trim();      // e.g., "September 2025"
-                var shownMonth = DateTime.ParseExact(headerText, "MMMM yyyy", CultureInfo.InvariantCulture);
-
-                if (shownMonth.Year == targetMonth.Year && shownMonth.Month == targetMonth.Month)
-                    break;
-
-                var nextMonth = shownMonth > targetMonth
-                    ? shownMonth.AddMonths(-1)
-                    : shownMonth.AddMonths(1);
-
-                if (shownMonth > targetMonth)
-                    await prevBtn.ClickAsync();
-                else
-                    await nextBtn.ClickAsync();
-
-                // Wait for the datepicker to render the next month before checking it again.
-                await _page.WaitForFunctionAsync(
-                    "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
-                    ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
-                    nextMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
-                    new() { Timeout = 5000 });
-                if (++guard > 24) throw new Exception("Could not navigate datepicker to the target month.");
+                string inputDate = inputType.Equals("date", StringComparison.OrdinalIgnoreCase)
+                    ? yesterday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    : startDate;
+                await TxtStartDate.FillAsync(inputDate);
+                await TxtStartDate.PressAsync("Tab");
+                selectedDateMatches = IsDateValue(yesterday, await TxtStartDate.InputValueAsync());
             }
 
-            // Select yesterday’s day cell inside the shown month (exclude old/new spillover)
-            int yesterdayDay = yesterday.Day;
-            var dayCell = dpRoot.Locator($@"td.day:not(.old):not(.new):text-is(""{yesterdayDay}"")");
+            if (!selectedDateMatches)
+            {
+                await TxtStartDate.ClickAsync();
 
-            // Fallback: if some themes don’t use old/new classes, just avoid disabled days
-            if (await dayCell.CountAsync() == 0)
-                dayCell = dpRoot.Locator($@"td.day:not(.disabled):text-is(""{yesterdayDay}"")");
+                var dpRoot = _page.Locator("div.datepicker-days:visible");
+                await dpRoot.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
 
-            await dayCell.First.ClickAsync();
-            await TxtStartDate.PressAsync("Tab");
+                var header = dpRoot.Locator("th.datepicker-switch");
+                var prevBtn = dpRoot.Locator("th.prev");
+                var nextBtn = dpRoot.Locator("th.next");
+                var targetMonth = new DateTime(yesterday.Year, yesterday.Month, 1);
+                int guard = 0;
 
-            // Optional: verify
+                while (true)
+                {
+                    string headerText = (await header.InnerTextAsync()).Trim();
+                    var shownMonth = DateTime.ParseExact(headerText, "MMMM yyyy", CultureInfo.InvariantCulture);
+
+                    if (shownMonth.Year == targetMonth.Year && shownMonth.Month == targetMonth.Month)
+                        break;
+
+                    var nextMonth = shownMonth > targetMonth
+                        ? shownMonth.AddMonths(-1)
+                        : shownMonth.AddMonths(1);
+
+                    if (shownMonth > targetMonth)
+                        await prevBtn.ClickAsync();
+                    else
+                        await nextBtn.ClickAsync();
+
+                    await _page.WaitForFunctionAsync(
+                        "expected => Array.from(document.querySelectorAll('div.datepicker-days th.datepicker-switch'))" +
+                        ".some(element => element.getClientRects().length > 0 && element.textContent.trim() === expected)",
+                        nextMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture),
+                        new() { Timeout = 5000 });
+
+                    if (++guard > 24)
+                        throw new InvalidOperationException("Could not navigate datepicker to the target month.");
+                }
+
+                int yesterdayDay = yesterday.Day;
+                var dayCell = dpRoot.Locator($@"td.day:not(.old):not(.new):text-is(""{yesterdayDay}"")");
+                if (await dayCell.CountAsync() == 0)
+                    dayCell = dpRoot.Locator($@"td.day:not(.disabled):text-is(""{yesterdayDay}"")");
+
+                await dayCell.First.ClickAsync();
+                await TxtStartDate.PressAsync("Tab");
+                selectedDateMatches = IsDateValue(yesterday, await TxtStartDate.InputValueAsync());
+            }
+
             string selectedDate = await TxtStartDate.InputValueAsync();
+            if (!selectedDateMatches)
+                throw new InvalidOperationException($"Unable to set ledger start date to {startDate}; the field contains '{selectedDate}'.");
+
             Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
 
 
