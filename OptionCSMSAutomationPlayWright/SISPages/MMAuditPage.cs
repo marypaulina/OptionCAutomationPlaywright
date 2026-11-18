@@ -533,35 +533,29 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
                 await WaitForLocatorWithFallbackAsync(Table911);
 
-                await _page.WaitForFunctionAsync(
-                    "() => {" +
-                    "const table = document.querySelector('#Table3');" +
-                    "if (!table || table.getClientRects().length === 0) return false;" +
-                    "const empty = table.querySelector('tbody td.dataTables_empty');" +
-                    "const text = (table.innerText || '').toLowerCase();" +
-                    "const noData = text.includes('no data') || text.includes('no record') || text.includes('no matching');" +
-                    "const total = table.querySelector('tfoot td:nth-child(2)');" +
-                    "return (empty && empty.getClientRects().length > 0) || noData || (total && total.getClientRects().length > 0);" +
-                    "}",
-                    null,
-                    new() { Timeout = MaximumUiWaitTimeoutMs });
-
                 var emptyResult = Table911.Locator("tbody td.dataTables_empty");
                 var resultText = (await Table911.InnerTextAsync()).ToLowerInvariant();
-                var hasNoData = await emptyResult.CountAsync() > 0
-                    && await emptyResult.First.IsVisibleAsync();
-                hasNoData = hasNoData
+                var emptyResultCount = await emptyResult.CountAsync();
+                var hasNoData = (emptyResultCount > 0 && await emptyResult.First.IsVisibleAsync())
                     || resultText.Contains("no data")
                     || resultText.Contains("no record")
                     || resultText.Contains("no matching");
+                var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
+                var footerCount = await Report911Value.CountAsync();
 
                 decimal rangeAmount;
-                if (hasNoData)
+                if (hasNoData || (bodyRowCount == 0 && footerCount == 0))
                 {
                     rangeAmount = 0m;
                 }
                 else
                 {
+                    if (footerCount == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Report 911 returned rows for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy} but no total was present.");
+                    }
+
                     await WaitForLocatorWithFallbackAsync(Report911Value.First);
                     var amountText = (await Report911Value.First.InnerTextAsync()).Trim();
                     if (!decimal.TryParse(
