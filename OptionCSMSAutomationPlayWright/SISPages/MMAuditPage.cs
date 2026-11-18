@@ -435,6 +435,21 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
         }
 
+        private async Task EnsureShowStaffCheckedAsync()
+        {
+            if (await StaffCheck.CountAsync() == 0)
+                return;
+
+            var staffCheckbox = StaffCheck.First;
+            if (!await staffCheckbox.IsVisibleAsync() || await staffCheckbox.IsCheckedAsync())
+                return;
+
+            if (!await staffCheckbox.IsEnabledAsync())
+                throw new InvalidOperationException("The Show Staff checkbox is visible but disabled.");
+
+            await staffCheckbox.CheckAsync();
+        }
+
         private static bool IsReport911NoDataMessage(string text)
         {
             return text.Contains("no data", StringComparison.OrdinalIgnoreCase)
@@ -553,12 +568,40 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (!await Btn911Filter.IsEnabledAsync())
                     throw new InvalidOperationException("Report 911 Run Report button is disabled.");
 
-                await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
+                await EnsureShowStaffCheckedAsync();
+                var reportWait = System.Diagnostics.Stopwatch.StartNew();
+                try
+                {
+                    await _page.RunAndWaitForNavigationAsync(
+                        () => Btn911Filter.ClickAsync(),
+                        new()
+                        {
+                            WaitUntil = WaitUntilState.DOMContentLoaded,
+                            Timeout = MaximumUiWaitTimeoutMs
+                        });
+                }
+                catch (TimeoutException ex)
+                {
+                    throw new TimeoutException(
+                        $"Report 911 navigation did not reach DOMContentLoaded within " +
+                        $"{MaximumUiWaitTimeoutMs}ms for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}.",
+                        ex);
+                }
+
                 var hasNoData = false;
                 try
                 {
-                    await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table911);
-                    await WaitForLocatorWithFallbackAsync(Table911);
+                    var remainingTimeout = Math.Max(
+                        1,
+                        MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                    await WaitForLoadingOverlayToDisappearAsync(
+                        timeout: remainingTimeout,
+                        readyLocator: Table911);
+
+                    remainingTimeout = Math.Max(
+                        1,
+                        MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                    await WaitForLocatorWithFallbackAsync(Table911, timeout: remainingTimeout);
                 }
                 catch (TimeoutException ex)
                 {
@@ -954,20 +997,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
                 }
 
-                // Select Staff if visible
-                if (await StaffCheck.IsVisibleAsync())
-                {
-                    await StaffCheck.ClickAsync();
-
-                    await _page.WaitForSelectorAsync(
-                        "//input[@value='Run Report']",
-                        new()
-                        {
-                            State = WaitForSelectorState.Visible,
-                            Timeout = 30000
-                        });
-                }
-
                 // Run Report
                 var runReportLocator = _page.Locator(
                     "//input[@type='button' and @value='Run Report' and contains(@class,'btn-info')]");
@@ -982,6 +1011,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (await runReportLocator.IsVisibleAsync() &&
                     await runReportLocator.IsEnabledAsync())
                 {
+                    await EnsureShowStaffCheckedAsync();
                     await BtnRunReport.ClickAsync();
                     await WaitForLoadingOverlayToDisappearAsync();
                 }
@@ -1033,6 +1063,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 Console.WriteLine("Account Created Radio button clicked.");
 
+                await EnsureShowStaffCheckedAsync();
                 if (await BtnRunReport.IsEnabledAsync())
                 {
                     await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
@@ -1145,6 +1176,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 LogToFile("Account History radio button selected.");
 
                 // Run Account History report
+                await EnsureShowStaffCheckedAsync();
                 if (await BtnRunReport.IsEnabledAsync())
                 {
                     await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
@@ -1352,15 +1384,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await _page.BringToFrontAsync(); // Bring the last page to the front
             await MaxWindow();
 
-            if (ReportId != 911)
-            {
-                // Check if the staff portal link is visible before clicking
-                if (await StaffCheck.IsVisibleAsync())
-                {
-                    await StaffCheck.ClickAsync();
-                }
-            }
-
             if (ReportId == 911)
             {
                 var report911Total = await GetReport911TotalAsync(auditWriter);
@@ -1388,6 +1411,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
 
             //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
+            await EnsureShowStaffCheckedAsync();
             await BtnFilter.ClickAsync(new() { Timeout = 20000 });
             await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table);
 
