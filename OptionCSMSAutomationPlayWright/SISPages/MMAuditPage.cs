@@ -118,8 +118,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator ThActivatedOn => _page.Locator("//th[@aria-controls='tblParentAccountSetup' and normalize-space()='Activated On']");
 
 
-        // X (Remind me later) button
-        private ILocator SurveyCloseButton => _page.Locator("//a[contains(@class,'md-close') and @data-dismiss='modal']");
         private ILocator ReactivatedPopup => _page.Locator(
             "//div[contains(@class,'modal-content') and contains(@class,'survey-modal-content') and contains(.,'Your MattMoney Account is now in Active')]");
         private ILocator ReactivatedCloseIcon =>
@@ -224,25 +222,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Navigate to the Acutis school details page
         }
 
-        /// <summary>
-        /// Closes survey popup if it is displayed.
-        /// Does nothing if popup is not present.
-        /// </summary>
-        public async Task CloseSurveyPopupIfPresentAsync()
-        {
-            try
-            {
-                await SurveyCloseButton.WaitForAsync(
-                    new() { State = WaitForSelectorState.Visible, Timeout = 1000 });
-            }
-            catch (TimeoutException)
-            {
-                return;
-            }
-
-            await SurveyCloseButton.ClickAsync();
-        }
-
         public async Task HandleMMMaintenancePopupIfPresentAsync()
         {
             try
@@ -340,19 +319,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }
 
                 Console.WriteLine("Logged in Successfully and Admin Dashboard is opened.");
-
-                // 🔹 Try to close survey popup if it appears
-                try
-                {
-                    await SurveyCloseButton.WaitForAsync(
-                        new() { State = WaitForSelectorState.Visible, Timeout = 3000 });
-                    Console.WriteLine("Survey popup appeared. Closing it.");
-                    await SurveyCloseButton.ClickAsync();
-                }
-                catch (TimeoutException)
-                {
-                    Console.WriteLine("Survey popup did not appear. Proceeding further.");
-                }
 
                 // Wait for school name
                 await SchoolName.WaitForAsync();
