@@ -245,7 +245,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task VerifySaintOfTheDaySectionAsync()
         {
             LogToFile("Verifying Saint of the Day Section", true);
-            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+            await _page.EvaluateAsync(
+                "window.scrollTo(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
 
             if (!await SODSection.IsVisibleAsync())
             {
@@ -269,7 +270,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task VerifyDailyReadingsOfTheDaySectionAsync()
         {
             LogToFile("Verifying Daily Readings Section", true);
-            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+            await _page.EvaluateAsync(
+                "window.scrollTo(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
 
             if (!await DailyReadingsSection.IsVisibleAsync())
             {
@@ -295,7 +297,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         {
             LogToFile("Verifying Events Section at Dashboard", true);
 
-            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+            await _page.EvaluateAsync(
+                "window.scrollTo(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
 
             if (!await EventsHeader.IsVisibleAsync())
             {
@@ -331,7 +334,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         {
             LogToFile("Verifying Task List Section", true);
 
-            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+            await _page.EvaluateAsync(
+                "window.scrollTo(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
 
             var taskListSection = _page.Locator("//h3[normalize-space()='Task List']");
 
@@ -369,7 +373,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         {
             LogToFile("Verifying Announcements Section at Dashboard", true);
 
-            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+            await _page.EvaluateAsync(
+                "window.scrollTo(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
 
             if (!await AnnouncementsHeader.IsVisibleAsync())
             {
@@ -403,7 +408,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         {
             LogToFile("Verifying New Messages Section at Dashboard", true);
 
-            await _page.EvaluateAsync("window.scrollTo(0, document.body.scrollHeight)");
+            await _page.EvaluateAsync(
+                "window.scrollTo(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
 
             if (!await NewMessagesHeader.IsVisibleAsync())
             {

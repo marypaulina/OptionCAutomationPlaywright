@@ -485,7 +485,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             try
             {
                 // Scroll to the bottom of the page
-                await _page.EvaluateAsync("window.scrollBy(0, document.body.scrollHeight)");
+                await _page.EvaluateAsync(
+                    "window.scrollBy(0, document.documentElement ? document.documentElement.scrollHeight : 0)");
                 // Wait for the Funding Amount label and get its text
                 await LblFundingAmount.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
                 string getFundingAmt = await LblFundingAmount.InnerTextAsync() ?? "0";
@@ -1886,7 +1887,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             string CCTotAmt = "0";
             string eCheckTotAmt = "0";
             decimal TotalAmount = 0;
-            await _page.EvaluateAsync("window.scrollBy(0, document.body.scrollHeight);");
+            await _page.EvaluateAsync(
+                "window.scrollBy(0, document.documentElement ? document.documentElement.scrollHeight : 0);");
             try
             {
                 var lblCCAmount = await LblCCAmount.InnerTextAsync();           
