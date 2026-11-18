@@ -24,6 +24,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         private const int InitialUiWaitTimeoutMs = 30000;
         private const int MaximumUiWaitTimeoutMs = 180000;
         private const int Report911RangeYears = 1;
+        private sealed record Report911RangeResult(
+            decimal? Amount,
+            int BodyRowCount,
+            bool NoRows,
+            string? Diagnostics,
+            TimeoutException? FooterWaitFailure);
+
         private static readonly HashSet<string> Report911SplitSchoolIdentifiers = new(StringComparer.OrdinalIgnoreCase)
         {
             "5158",
@@ -130,6 +137,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator Report911Value => _page.Locator("//tfoot//td[2]");
         public ILocator Table => _page.Locator("//*[@id='DataTables_Table_0']");
         public ILocator Table911 => _page.Locator("//*[@id='Table3']");
+        private ILocator Report911Total => Table911.Locator("tfoot td:nth-child(2)");
         public ILocator ReportResult => _page.Locator("//*[@id='export-content']");
         public ILocator RecordLength => _page.Locator("//*[@class='form-control input-xsmall input-inline']");
         public ILocator AllRecord => _page.Locator("//*[@class='form-control input-xsmall input-inline']//option[@value='-1']");
@@ -613,114 +621,46 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             decimal total = 0m;
             for (var index = 0; index < ranges.Length; index++)
             {
+                var (startDate, endDate) = ranges[index];
                 if (index > 0)
                     await OpenFreshReportPageAsync(911);
 
-                var (startDate, endDate) = ranges[index];
-                await SetReportDateFilterAsync(TransStartDateFilter, startDate, "start");
-                if (hasEditableEndDateFilter)
-                    await SetReportDateFilterAsync(TransEndDateFilter, endDate, "end");
-
-                if (!await Btn911Filter.IsEnabledAsync())
-                    throw new InvalidOperationException("Report 911 Run Report button is disabled.");
-
-                await EnsureShowStaffCheckedAsync();
-                var reportWait = System.Diagnostics.Stopwatch.StartNew();
-                try
+                var rangeResult = await RunReport911RangeAsync(
+                    startDate,
+                    endDate,
+                    hasEditableEndDateFilter);
+                if (rangeResult.Amount == null && !rangeResult.NoRows)
                 {
-                    await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
-                    var navigationTimeout = Math.Max(
-                        1,
-                        MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
-                    await _page.WaitForLoadStateAsync(
-                        LoadState.DOMContentLoaded,
-                        new() { Timeout = navigationTimeout });
-                }
-                catch (TimeoutException ex)
-                {
-                    throw new TimeoutException(
-                        $"Report 911 navigation did not reach DOMContentLoaded within " +
-                        $"{MaximumUiWaitTimeoutMs}ms for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}.",
-                        ex);
+                    await auditWriter.WriteLineAsync(
+                        $"Report 911 did not show a total for {startDate:MM/dd/yyyy} - " +
+                        $"{endDate:MM/dd/yyyy}; retrying once on a fresh report page.");
+                    await auditWriter.FlushAsync();
+                    await OpenFreshReportPageAsync(911);
+                    rangeResult = await RunReport911RangeAsync(
+                        startDate,
+                        endDate,
+                        hasEditableEndDateFilter);
                 }
 
-                var hasNoData = false;
-                try
+                if (rangeResult.Amount == null)
                 {
-                    var remainingTimeout = Math.Max(
-                        1,
-                        MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
-                    await WaitForLoadingOverlayToDisappearAsync(
-                        timeout: remainingTimeout,
-                        readyLocator: Table911);
-
-                    remainingTimeout = Math.Max(
-                        1,
-                        MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
-                    await WaitForLocatorWithFallbackAsync(Table911, timeout: remainingTimeout);
-                }
-                catch (TimeoutException ex)
-                {
-                    var pageText = await _page.Locator("body").InnerTextAsync();
-                    if (!IsReport911NoDataMessage(pageText))
-                    {
-                        throw new TimeoutException(
-                            $"Report 911 did not show a result table or a no-data message for " +
-                            $"{startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}.",
-                            ex);
-                    }
-
-                    hasNoData = true;
+                    throw new InvalidOperationException(
+                        $"Report 911 returned {rangeResult.BodyRowCount} rows for " +
+                        $"{startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy} but no total appeared " +
+                        $"after retry. Table diagnostics: {rangeResult.Diagnostics}",
+                        rangeResult.FooterWaitFailure);
                 }
 
-                if (!hasNoData)
+                if (rangeResult.NoRows)
                 {
-                    var emptyResult = Table911.Locator("tbody td.dataTables_empty");
-                    var emptyResultCount = await emptyResult.CountAsync();
-                    var resultText = await Table911.InnerTextAsync();
-                    hasNoData = (emptyResultCount > 0 && await emptyResult.First.IsVisibleAsync())
-                        || IsReport911NoDataMessage(resultText);
+                    await auditWriter.WriteLineAsync(
+                        $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
+                        $"{rangeDescription}: $0.00 (no rows)");
+                    await auditWriter.FlushAsync();
+                    continue;
                 }
 
-                decimal rangeAmount;
-                if (hasNoData)
-                {
-                    rangeAmount = 0m;
-                }
-                else
-                {
-                    var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
-                    var footerCount = await Report911Value.CountAsync();
-                    if (bodyRowCount == 0 && footerCount == 0)
-                    {
-                        rangeAmount = 0m;
-                        total += rangeAmount;
-                        await auditWriter.WriteLineAsync(
-                            $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
-                            $"{rangeDescription}: $0.00 (no rows)");
-                        await auditWriter.FlushAsync();
-                        continue;
-                    }
-
-                    if (footerCount == 0)
-                    {
-                        throw new InvalidOperationException(
-                            $"Report 911 returned rows for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy} but no total was present.");
-                    }
-
-                    await WaitForLocatorWithFallbackAsync(Report911Value.First);
-                    var amountText = (await Report911Value.First.InnerTextAsync()).Trim();
-                    if (!decimal.TryParse(
-                            amountText,
-                            NumberStyles.Currency,
-                            CultureInfo.GetCultureInfo("en-US"),
-                            out rangeAmount))
-                    {
-                        throw new FormatException(
-                            $"Report 911 returned an invalid total for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: '{amountText}'.");
-                    }
-                }
-
+                var rangeAmount = rangeResult.Amount.Value;
                 total += rangeAmount;
                 await auditWriter.WriteLineAsync(
                     $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}" +
@@ -734,6 +674,182 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await auditWriter.FlushAsync();
 
             return total;
+        }
+
+        private async Task<Report911RangeResult> RunReport911RangeAsync(
+            DateTime startDate,
+            DateTime endDate,
+            bool hasEditableEndDateFilter)
+        {
+            await TransStartDateFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await Btn911Filter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+            await SetReportDateFilterAsync(TransStartDateFilter, startDate, "start");
+            if (hasEditableEndDateFilter)
+                await SetReportDateFilterAsync(TransEndDateFilter, endDate, "end");
+
+            if (!await Btn911Filter.IsEnabledAsync())
+                throw new InvalidOperationException("Report 911 Run Report button is disabled.");
+
+            await EnsureShowStaffCheckedAsync();
+            var reportWait = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                await Btn911Filter.ClickAsync(new() { NoWaitAfter = true });
+                var navigationTimeout = Math.Max(
+                    1,
+                    MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                await _page.WaitForLoadStateAsync(
+                    LoadState.DOMContentLoaded,
+                    new() { Timeout = navigationTimeout });
+            }
+            catch (TimeoutException ex)
+            {
+                throw new TimeoutException(
+                    $"Report 911 navigation did not reach DOMContentLoaded within " +
+                    $"{MaximumUiWaitTimeoutMs}ms for {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}.",
+                    ex);
+            }
+
+            var hasNoData = false;
+            try
+            {
+                var remainingTimeout = Math.Max(
+                    1,
+                    MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                await WaitForLoadingOverlayToDisappearAsync(
+                    timeout: remainingTimeout,
+                    readyLocator: Table911);
+
+                remainingTimeout = Math.Max(
+                    1,
+                    MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                await WaitForLocatorWithFallbackAsync(Table911, timeout: remainingTimeout);
+            }
+            catch (TimeoutException ex)
+            {
+                var pageText = await _page.Locator("body").InnerTextAsync();
+                if (!IsReport911NoDataMessage(pageText))
+                {
+                    throw new TimeoutException(
+                        $"Report 911 did not show a result table or a no-data message for " +
+                        $"{startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}.",
+                        ex);
+                }
+
+                hasNoData = true;
+            }
+
+            if (!hasNoData)
+            {
+                var emptyResult = Table911.Locator("tbody td.dataTables_empty");
+                var emptyResultCount = await emptyResult.CountAsync();
+                var resultText = await Table911.InnerTextAsync();
+                hasNoData = (emptyResultCount > 0 && await emptyResult.First.IsVisibleAsync())
+                    || IsReport911NoDataMessage(resultText);
+            }
+
+            if (hasNoData)
+                return new Report911RangeResult(0m, 0, true, null, null);
+
+            var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
+            var footerCount = await Report911Total.CountAsync();
+            if (bodyRowCount == 0 && footerCount == 0)
+                return new Report911RangeResult(0m, 0, true, null, null);
+
+            TimeoutException? footerWaitFailure = null;
+            if (footerCount == 0)
+            {
+                var remainingTimeout = Math.Max(
+                    1,
+                    MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
+                try
+                {
+                    await WaitForLocatorWithFallbackAsync(
+                        Report911Total.First,
+                        timeout: remainingTimeout);
+                }
+                catch (TimeoutException ex)
+                {
+                    footerWaitFailure = ex;
+                }
+
+                footerCount = await Report911Total.CountAsync();
+            }
+
+            if (footerCount == 0)
+            {
+                var tableDiagnostics = await Table911.EvaluateAsync<string>(
+                    @"table => JSON.stringify({
+                        className: table.className,
+                        headerTexts: Array.from(table.querySelectorAll('thead th'),
+                            cell => cell.textContent.trim()),
+                        tableRows: Array.from(table.ownerDocument.querySelectorAll('table'),
+                            candidate => ({
+                                id: candidate.id,
+                                className: candidate.className,
+                                rowCount: candidate.querySelectorAll('tbody tr').length,
+                                footerCount: candidate.querySelectorAll('tfoot').length,
+                                headers: Array.from(candidate.querySelectorAll('thead th'),
+                                    cell => cell.textContent.trim())
+                            })),
+                        bodyRowCount: table.querySelectorAll('tbody tr').length,
+                        firstRowCellCount: table.querySelector('tbody tr')?.cells.length ?? 0,
+                        columnSummaries: (() => {
+                            const rows = Array.from(table.querySelectorAll('tbody tr'));
+                            const columnCount = rows[0]?.cells.length ?? 0;
+                            return Array.from({ length: columnCount }, (_, index) => {
+                                const values = rows.map(row =>
+                                    (row.cells[index]?.textContent ?? '').trim());
+                                const currencyValues = values.filter(value =>
+                                    /[$,.]/.test(value)
+                                    && /^\(?-?\$?\s*\d[\d,]*(?:\.\d{1,2})?\)?$/.test(value));
+                                const sum = currencyValues.reduce((total, value) => {
+                                    const normalized = value.replace(/[$,\s]/g, '');
+                                    const amount = normalized.startsWith('(')
+                                        ? -Number(normalized.slice(1, -1))
+                                        : Number(normalized);
+                                    return total + amount;
+                                }, 0);
+                                return {
+                                    index,
+                                    currencyValueCount: currencyValues.length,
+                                    currencySum: sum
+                                };
+                            });
+                        })(),
+                        footerCount: table.querySelectorAll('tfoot').length,
+                        footerCellCount: table.querySelectorAll('tfoot td').length,
+                        totalLabelCount: Array.from(table.querySelectorAll('td, th'))
+                            .filter(cell => /^\s*total\s*:?\s*$/i.test(cell.textContent)).length,
+                        dataTablesApiInfo: (() => {
+                            const jq = table.ownerDocument.defaultView?.jQuery;
+                            return jq?.fn?.dataTable?.isDataTable(table)
+                                ? jq(table).DataTable().page.info()
+                                : null;
+                        })()
+                    })");
+                return new Report911RangeResult(
+                    null,
+                    bodyRowCount,
+                    false,
+                    tableDiagnostics,
+                    footerWaitFailure);
+            }
+
+            var amountText =
+                (await Report911Total.First.TextContentAsync())?.Trim() ?? string.Empty;
+            if (!decimal.TryParse(
+                    amountText,
+                    NumberStyles.Currency,
+                    CultureInfo.GetCultureInfo("en-US"),
+                    out var rangeAmount))
+            {
+                throw new FormatException(
+                    $"Report 911 returned an invalid total for {startDate:MM/dd/yyyy} - " +
+                    $"{endDate:MM/dd/yyyy}: '{amountText}'.");
+            }
+
+            return new Report911RangeResult(rangeAmount, bodyRowCount, false, null, null);
         }
 
         private static bool IsDateValue(DateTime expectedDate, string actualValue)

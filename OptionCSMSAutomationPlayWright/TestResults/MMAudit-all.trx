@@ -1,0 +1,150 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="6acb18eb-a056-46c0-bf5c-b96d288c5066" name="Bsoft@BSOFT-10-L-1A 2026-11-18 20:41:24" runUser="BSOFT-10-L-1A\Bsoft" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-11-18T20:41:24.1866799+05:30" queuing="2026-11-18T20:41:24.1866803+05:30" start="2026-11-18T20:36:08.8396573+05:30" finish="2026-11-18T20:41:24.2039927+05:30" />
+  <TestSettings name="default" id="f48f3a81-fd63-4d45-8973-bc052f65765d">
+    <Deployment runDeploymentRoot="Bsoft_BSOFT-10-L-1A_2026-11-18_20_41_24" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="d403d4dc-0426-41c4-a59e-7fa1a6dc5ca5" testId="a81fdd81-3a80-8da9-0631-6b454780b2db" testName="_001_ToGenerateTheDailyMMAuditReportForAllTheMMSchoolsAndConfirmTheTransactionsAreCorrect" computerName="BSOFT-10-L-1A" duration="00:05:13.1593570" startTime="2026-11-18T20:36:09.9136069+05:30" endTime="2026-11-18T20:41:23.0728823+05:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d403d4dc-0426-41c4-a59e-7fa1a6dc5ca5">
+      <Output>
+        <StdOut>BeforeScenario&#xD;
+Given Acutis User has successfully launched&#xD;
+  --- table step argument ---&#xD;
+  | URL                         | Username             | Password  |&#xD;
+  | https://acutis.optionc.com/ | jclement@optionc.com | viper@123 |&#xD;
+The Given URL is: https://acutis.optionc.com/&#xD;
+-&gt; done: MMAuditStepDefinitions.GivenAcutisUserHasSuccessfullyLaunched(&lt;table&gt;) (4.7s)&#xD;
+And Open all the MM schools and audit the fee details everyday&#xD;
+  --- table step argument ---&#xD;
+  | SchoolCode | StartDate  |&#xD;
+  | 8400       | 06/10/2026 |&#xD;
+  | 7296       | 07/20/2026 |&#xD;
+  | 8417       | 07/20/2026 |&#xD;
+  | 8369       | 07/20/2026 |&#xD;
+  | 8407       | 07/20/2026 |&#xD;
+  | 8188       | 07/20/2026 |&#xD;
+  | 8232       | 07/20/2026 |&#xD;
+  | 8545       | 06/14/2026 |&#xD;
+  | 8235       | 06/26/2026 |&#xD;
+  | 6904       | 07/20/2026 |&#xD;
+  | 8351       | 06/22/2026 |&#xD;
+  | 7291       | 07/01/2026 |&#xD;
+  | 7304       | 07/01/2026 |&#xD;
+  | 8763       | 07/08/2026 |&#xD;
+  | 8308       | 06/18/2026 |&#xD;
+  | 142        | 05/22/2026 |&#xD;
+Logged in Successfully and Admin Dashboard is opened.&#xD;
+No MattMoney maintenance popup appeared.&#xD;
+MM Reactivated popup not displayed. Continuing...&#xD;
+Landed in Fee Management page&#xD;
+Expected Start Date: 11/17/2026, Selected Start Date: 11/17/2026&#xD;
+Fee Reports page is opened&#xD;
+911 report is searched&#xD;
+911 report is searched&#xD;
+911 report is searched&#xD;
+Loading overlay is still visible after 30000ms; waiting up to 149960ms for the page to become ready.&#xD;
+911 report is searched&#xD;
+Loading overlay is still visible after 30000ms; waiting up to 149944ms for the page to become ready.&#xD;
+Page content was not ready after 30000ms; waiting up to 89743ms more.&#xD;
+-&gt; error: Report 911 returned 209 rows for 01/01/2023 - 12/31/2023 but no total appeared. (306.0s)&#xD;
+Failed to capture screenshot: Target page, context or browser has been closed</StdOut>
+        <ErrorInfo>
+          <Message>System.InvalidOperationException : Report 911 returned 209 rows for 01/01/2023 - 12/31/2023 but no total appeared.&#xD;
+  ----&gt; System.TimeoutException : Timeout 89743ms exceeded.&#xD;
+Call log:&#xD;
+  -   - waiting for Locator("//*[@id='Table3']").Locator("tfoot td:nth-child(2)").First to be visible</Message>
+          <StackTrace>   at OptionCSMSAutomationPlayWright.SISPages.MMAuditPages.GetReport911TotalAsync(StreamWriter auditWriter, String schoolIdentifier) in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\SISPages\MMAuditPage.cs:line 728&#xD;
+   at OptionCSMSAutomationPlayWright.SISPages.MMAuditPages.StartFilterAsync(Int64 ReportId, Report objReport, StreamWriter auditWriter, String schoolIdentifier) in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\SISPages\MMAuditPage.cs:line 1472&#xD;
+   at OptionCSMSAutomationPlayWright.SISPages.MMAuditPages.LoopFilterAsync(String schoolIdentifier) in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\SISPages\MMAuditPage.cs:line 1581&#xD;
+   at OptionCSMSAutomationPlayWright.StepDefinitions.MMAuditStepDefinitions.GivenOpenAllTheMMSchoolsAndAuditTheFeeDetailsEveryday(Table auditTable) in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\StepDefinitions\MMAuditStepDefinitions.cs:line 58&#xD;
+   at TechTalk.SpecFlow.Bindings.SynchronousBindingDelegateInvoker.&lt;&gt;c__DisplayClass2_0.&lt;&lt;InvokeBindingDelegateAsync&gt;b__0&gt;d.MoveNext()&#xD;
+--- End of stack trace from previous location ---&#xD;
+   at TechTalk.SpecFlow.Bindings.AsyncHelpers.&lt;&gt;c__DisplayClass1_0`1.&lt;&lt;RunSync&gt;b__0&gt;d.MoveNext()&#xD;
+--- End of stack trace from previous location ---&#xD;
+   at TechTalk.SpecFlow.Bindings.AsyncHelpers.ExclusiveSynchronizationContext.BeginMessageLoop()&#xD;
+   at TechTalk.SpecFlow.Bindings.AsyncHelpers.RunSync[T](Func`1 task)&#xD;
+   at TechTalk.SpecFlow.Bindings.SynchronousBindingDelegateInvoker.InvokeBindingDelegateAsync(Delegate bindingDelegate, Object[] invokeArgs)&#xD;
+   at TechTalk.SpecFlow.Bindings.SynchronousBindingDelegateInvoker.InvokeDelegateSynchronously(Delegate bindingDelegate, Object[] invokeArgs)&#xD;
+   at TechTalk.SpecFlow.Bindings.BindingInvoker.InvokeBinding(IBinding binding, IContextManager contextManager, Object[] arguments, ITestTracer testTracer, TimeSpan&amp; duration)&#xD;
+   at TechTalk.SpecFlow.Infrastructure.TestExecutionEngine.ExecuteStepMatch(BindingMatch match, Object[] arguments, TimeSpan&amp; duration)&#xD;
+   at TechTalk.SpecFlow.Infrastructure.TestExecutionEngine.ExecuteStep(IContextManager contextManager, StepInstance stepInstance)&#xD;
+   at TechTalk.SpecFlow.Infrastructure.TestExecutionEngine.OnAfterLastStep()&#xD;
+   at TechTalk.SpecFlow.TestRunner.CollectScenarioErrors()&#xD;
+   at OptionCSMSAutomationPlayWright.Features.MMAuditFeature.ScenarioCleanup()&#xD;
+   at OptionCSMSAutomationPlayWright.Features.MMAuditFeature._001_ToGenerateTheDailyMMAuditReportForAllTheMMSchoolsAndConfirmTheTransactionsAreCorrect() in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\Features\MMAudit.feature:line 11&#xD;
+--TimeoutException&#xD;
+   at Microsoft.Playwright.Transport.Connection.InnerSendMessageToServerAsync[T](ChannelOwner object, String method, Dictionary`2 dictionary, Boolean keepNulls) in /_/src/Playwright/Transport/Connection.cs:line 228&#xD;
+   at Microsoft.Playwright.Transport.Connection.WrapApiCallAsync[T](Func`1 action, Boolean isInternal) in /_/src/Playwright/Transport/Connection.cs:line 535&#xD;
+   at OptionCSMSAutomationPlayWright.SISPages.MMAuditPages.WaitForLocatorWithFallbackAsync(ILocator locator, WaitForSelectorState state, Int32 timeout) in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\SISPages\MMAuditPage.cs:line 441&#xD;
+   at OptionCSMSAutomationPlayWright.SISPages.MMAuditPages.GetReport911TotalAsync(StreamWriter auditWriter, String schoolIdentifier) in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\SISPages\MMAuditPage.cs:line 714
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="_001_ToGenerateTheDailyMMAuditReportForAllTheMMSchoolsAndConfirmTheTransactionsAreCorrect" storage="e:\projects\github projects\optioncsmsautomationplaywright\optioncsmsautomationplaywright\bin\debug\net6.0\optioncsmsautomationplaywright.dll" id="a81fdd81-3a80-8da9-0631-6b454780b2db">
+      <Execution id="d403d4dc-0426-41c4-a59e-7fa1a6dc5ca5" />
+      <TestMethod codeBase="E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\bin\Debug\net6.0\OptionCSMSAutomationPlayWright.dll" adapterTypeName="executor://nunit3testexecutor/" className="OptionCSMSAutomationPlayWright.Features.MMAuditFeature" name="_001_ToGenerateTheDailyMMAuditReportForAllTheMMSchoolsAndConfirmTheTransactionsAreCorrect" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="a81fdd81-3a80-8da9-0631-6b454780b2db" executionId="d403d4dc-0426-41c4-a59e-7fa1a6dc5ca5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="1" executed="1" passed="0" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>NUnit Adapter 5.0.0.0: Test execution started&#xD;
+Running selected tests in E:\Projects\GitHub Projects\OptionCSMSAutomationPlayWright\OptionCSMSAutomationPlayWright\bin\Debug\net6.0\OptionCSMSAutomationPlayWright.dll&#xD;
+   NUnit3TestExecutor discovered 1 of 1 NUnit test cases using Current Discovery mode, Non-Explicit run&#xD;
+BeforeScenario&#xD;
+Given Acutis User has successfully launched&#xD;
+  --- table step argument ---&#xD;
+  | URL                         | Username             | Password  |&#xD;
+  | https://acutis.optionc.com/ | jclement@optionc.com | viper@123 |&#xD;
+The Given URL is: https://acutis.optionc.com/&#xD;
+-&gt; done: MMAuditStepDefinitions.GivenAcutisUserHasSuccessfullyLaunched(&lt;table&gt;) (4.7s)&#xD;
+And Open all the MM schools and audit the fee details everyday&#xD;
+  --- table step argument ---&#xD;
+  | SchoolCode | StartDate  |&#xD;
+  | 8400       | 06/10/2026 |&#xD;
+  | 7296       | 07/20/2026 |&#xD;
+  | 8417       | 07/20/2026 |&#xD;
+  | 8369       | 07/20/2026 |&#xD;
+  | 8407       | 07/20/2026 |&#xD;
+  | 8188       | 07/20/2026 |&#xD;
+  | 8232       | 07/20/2026 |&#xD;
+  | 8545       | 06/14/2026 |&#xD;
+  | 8235       | 06/26/2026 |&#xD;
+  | 6904       | 07/20/2026 |&#xD;
+  | 8351       | 06/22/2026 |&#xD;
+  | 7291       | 07/01/2026 |&#xD;
+  | 7304       | 07/01/2026 |&#xD;
+  | 8763       | 07/08/2026 |&#xD;
+  | 8308       | 06/18/2026 |&#xD;
+  | 142        | 05/22/2026 |&#xD;
+Logged in Successfully and Admin Dashboard is opened.&#xD;
+No MattMoney maintenance popup appeared.&#xD;
+MM Reactivated popup not displayed. Continuing...&#xD;
+Landed in Fee Management page&#xD;
+Expected Start Date: 11/17/2026, Selected Start Date: 11/17/2026&#xD;
+Fee Reports page is opened&#xD;
+911 report is searched&#xD;
+911 report is searched&#xD;
+911 report is searched&#xD;
+Loading overlay is still visible after 30000ms; waiting up to 149960ms for the page to become ready.&#xD;
+911 report is searched&#xD;
+Loading overlay is still visible after 30000ms; waiting up to 149944ms for the page to become ready.&#xD;
+Page content was not ready after 30000ms; waiting up to 89743ms more.&#xD;
+-&gt; error: Report 911 returned 209 rows for 01/01/2023 - 12/31/2023 but no total appeared. (306.0s)&#xD;
+Failed to capture screenshot: Target page, context or browser has been closed&#xD;
+&#xD;
+NUnit Adapter 5.0.0.0: Test execution complete&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
