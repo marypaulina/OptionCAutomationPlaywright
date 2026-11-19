@@ -3,6 +3,7 @@ using AventStack.ExtentReports.Gherkin.Model;
 using AventStack.ExtentReports.Reporter;
 using BoDi;
 using Microsoft.Playwright;
+using OptionCSMSAutomationPlayWright.Support;
 using TechTalk.SpecFlow;
 
 namespace OptionCSMSAutomationPlayWright.Hooks
@@ -63,6 +64,7 @@ namespace OptionCSMSAutomationPlayWright.Hooks
 
             // Create a new context
             var context = await _browser.NewContextAsync();
+            PlaywrightTimeoutPolicy.Configure(context);
 
             // Create a new page within the context
             _page = await context.NewPageAsync();

@@ -16,6 +16,7 @@ using OpenQA.Selenium;
 using CsvHelper;
 using OpenQA.Selenium.BiDi.Modules.BrowsingContext;
 using System.Globalization;
+using OptionCSMSAutomationPlayWright.Support;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -63,7 +64,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public MMAuditPages(IPage page, WaitHelper waitHelper) : base(page)
         {         
             _page = page;
-            _page.SetDefaultTimeout(30000);
             this.waitHelper = waitHelper;
             path = Path.Combine(directoryPath, "Audit Summary.txt");
 
@@ -137,7 +137,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator Report911Value => _page.Locator("//tfoot//td[2]");
         public ILocator Table => _page.Locator("//*[@id='DataTables_Table_0']");
         public ILocator Table911 => _page.Locator("//*[@id='Table3']");
-        private ILocator Report911Total => Table911.Locator("tfoot td:nth-child(2)");
+        private ILocator Report911Total => _page.Locator(
+            "table:visible:has(thead th:text-is('Funding Date'))" +
+            ":has(tbody tr):has(tfoot) tfoot td:nth-child(2):visible");
         public ILocator ReportResult => _page.Locator("//*[@id='export-content']");
         public ILocator RecordLength => _page.Locator("//*[@class='form-control input-xsmall input-inline']");
         public ILocator AllRecord => _page.Locator("//*[@class='form-control input-xsmall input-inline']//option[@value='-1']");
@@ -185,7 +187,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         //1. Load URL method    
         public async Task LoadURLAsync(string URL)
         {
-            await _page.GotoAsync(URL, new() { Timeout = 100000 });
+            await _page.GotoAsync(URL, new()
+            {
+                Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs
+            });
             //await _page.SetViewportSizeAsync(1920, 1080);
             Console.WriteLine($"The Given URL is: {URL}");
         }
@@ -224,7 +229,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             var waitForNewPage = _page.Context.WaitForPageAsync(); // Prepare to wait for the new page before clicking
 
-            await IconNextGen.First.ClickAsync(new() { Timeout = 30000 }); // Click the NextGen icon (which opens a new tab)
+            await IconNextGen.First.ClickAsync(new()
+            {
+                Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+            }); // Click the NextGen icon (which opens a new tab)
 
             var newPage = await waitForNewPage; // Wait for the new page to be created
 
@@ -238,7 +246,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await _page.CloseAsync(); // Close the current page only if it's still open
             }
             _page = newPage; // Update _page to reference the new page
-            _page.SetDefaultTimeout(30000);
+            PlaywrightTimeoutPolicy.Configure(_page.Context);
 
             await MaxWindow();
 
@@ -253,7 +261,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task BackToAcutisAsync()
         {
             await MaxWindow();
-            await _page.GotoAsync("https://acutis.optionc.com/school-details", new() { Timeout = 100000 });
+            await _page.GotoAsync(
+                "https://acutis.optionc.com/school-details",
+                new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
             // Navigate to the Acutis school details page
         }
 
@@ -564,7 +574,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             var reportListPage = _page;
             await reportListPage.GotoAsync(
                 "https://feemanagement.optionc.com/report-list",
-                new() { Timeout = 100000 });
+                new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
 
             var (reportFound, _) = await SearchFeeReportAsync(reportId, reportListPage);
             if (!reportFound)
@@ -577,7 +587,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             await reportListPage.CloseAsync();
             _page = reportPage;
-            _page.SetDefaultTimeout(30000);
+            PlaywrightTimeoutPolicy.Configure(_page.Context);
             await _page.BringToFrontAsync();
             await MaxWindow();
         }
@@ -900,7 +910,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await FeeReportsSearch.WaitForAsync(new LocatorWaitForOptions
             {
                 State = WaitForSelectorState.Visible,
-                Timeout = 10000 // Timeout in milliseconds (10 seconds)
+                Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
             });
 
             await MaxWindow();
@@ -925,6 +935,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             var reportPageTask = _page.Context.WaitForPageAsync();
             await FeeReportsFirst.ClickAsync();
             var reportPage = await reportPageTask;
+            PlaywrightTimeoutPolicy.Configure(reportPage.Context);
             await reportPage.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
             await MaxWindow();
             return (true, reportId);
@@ -1144,7 +1155,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 await _page.GotoAsync(
                     "https://feemanagement.optionc.com/report-list",
-                    new() { Timeout = 100000 });
+                    new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
 
                 await SearchFeeReportAsync(907, _page);
 
@@ -1165,7 +1176,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     _page = _page.Context.Pages.LastOrDefault()
                         ?? throw new Exception("Failed to switch to the last opened page.");
 
-                    _page.SetDefaultTimeout(30000);
+                    PlaywrightTimeoutPolicy.Configure(_page.Context);
                     await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
                 }
 
@@ -1177,7 +1188,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     new()
                     {
                         State = WaitForSelectorState.Visible,
-                        Timeout = 50000
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
                     });
 
                 if (await runReportLocator.IsVisibleAsync() &&
@@ -1197,7 +1208,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     new()
                     {
                         State = WaitForSelectorState.Visible,
-                        Timeout = 30000
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
                     });
 
                 // Display all records
@@ -1238,7 +1249,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await EnsureShowStaffCheckedAsync();
                 if (await BtnRunReport.IsEnabledAsync())
                 {
-                    await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
+                    await BtnRunReport.ClickAsync(new()
+                    {
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                    });
 
                     Console.WriteLine("Run Report clicked for Account Created.");
                     await WaitForLoadingOverlayToDisappearAsync();
@@ -1351,7 +1365,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await EnsureShowStaffCheckedAsync();
                 if (await BtnRunReport.IsEnabledAsync())
                 {
-                    await BtnRunReport.ClickAsync(new() { Timeout = 10000 });
+                    await BtnRunReport.ClickAsync(new()
+                    {
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                    });
 
                     LogToFile("Run Report clicked for Account History.");
                     await WaitForLoadingOverlayToDisappearAsync();
@@ -1366,7 +1383,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     new()
                     {
                         State = WaitForSelectorState.Visible,
-                        Timeout = 30000
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
                     });
 
                 // Display all Account History records
@@ -1556,7 +1573,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             // Update _page to reference the last page
             _page = lastPage;
-            _page.SetDefaultTimeout(30000);
+            PlaywrightTimeoutPolicy.Configure(_page.Context);
             await _page.BringToFrontAsync(); // Bring the last page to the front
             await MaxWindow();
 
@@ -1588,7 +1605,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             //await WaitForElementAsync("//input[@onclick='ShowReportDetails(this.id)']");
             await EnsureShowStaffCheckedAsync();
-            await BtnFilter.ClickAsync(new() { Timeout = 20000 });
+            await BtnFilter.ClickAsync(new()
+            {
+                Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+            });
             await WaitForLoadingOverlayToDisappearAsync(readyLocator: Table);
 
             // Wait for the table to load
@@ -1667,7 +1687,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     foreach (var reportId in reportIds)
                     {
                         await MaxWindow();
-                        await _page.GotoAsync("https://feemanagement.optionc.com/report-list", new() { Timeout = 100000 });
+                        await _page.GotoAsync(
+                            "https://feemanagement.optionc.com/report-list",
+                            new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
 
                         await SearchFeeReportAsync(reportId, _page);
                         await MaxWindow();
@@ -2205,7 +2227,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             #endregion
             // Wait for next element
-            await TxtEndDate.WaitForAsync(new() { Timeout = 30000 });
+            await TxtEndDate.WaitForAsync(new()
+            {
+                Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+            });
 
             /*
                         await TxtStartDate.WaitForAsync();

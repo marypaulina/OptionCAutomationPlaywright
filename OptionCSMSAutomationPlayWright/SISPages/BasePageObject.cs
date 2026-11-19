@@ -1,6 +1,7 @@
 ﻿using Atata;
 using Microsoft.Playwright;
 using OptionCSMSAutomationPlayWright.ParishPages;
+using OptionCSMSAutomationPlayWright.Support;
 
 namespace OptionCSMSAutomationPlayWright.SISPages
 {
@@ -13,6 +14,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public BasePageObject(IPage page)
         {
             _page = page;
+            PlaywrightTimeoutPolicy.Configure(_page.Context);
             waitHelper = new WaitHelper(_page);
         }
         protected ILocator SearchInput => _page.Locator("//input[@placeholder='Search']");
@@ -32,7 +34,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             return await _page.Locator(selector).InnerTextAsync();
         }
 
-        public async Task WaitForElementAsync(string selector, int timeout = 60000)
+        public async Task WaitForElementAsync(
+            string selector,
+            int timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs)
         {
             await _page.Locator(selector).WaitForAsync(new LocatorWaitForOptions { Timeout = timeout });
         }

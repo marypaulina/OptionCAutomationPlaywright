@@ -17,6 +17,7 @@ using OpenQA.Selenium;
 using CsvHelper;
 using OpenQA.Selenium.BiDi.Modules.BrowsingContext;
 using System.Globalization;
+using OptionCSMSAutomationPlayWright.Support;
 using static Microsoft.AspNetCore.Razor.Language.TagHelperMetadata;
 using Dynamitey.DynamicObjects;
 
@@ -35,7 +36,6 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public ParishPage(IPage page, WaitHelper waitHelper) : base(page)
         {
             _page = page;
-            _page.SetDefaultTimeout(30000);
             this.waitHelper = waitHelper;
         }
 
@@ -197,8 +197,8 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
                 // Capture new tab
                 var newPage = await pageTask;
 
+                PlaywrightTimeoutPolicy.Configure(newPage.Context);
                 await newPage.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                newPage.SetDefaultTimeout(30000);
 
                 LogToFile("New tab loaded");
 
@@ -444,7 +444,10 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
         public async Task LoadAcutisURLAsync(string URL)
         {
             LogToFile("Initializing test session...", true);
-            await _page.GotoAsync(URL, new() { Timeout = 30000 });
+            await _page.GotoAsync(URL, new()
+            {
+                Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs
+            });
             LogToFile($"🌐 Loaded URL: {URL}");
         }
         //Enter the parish user credentials
@@ -515,7 +518,10 @@ namespace OptionCSMSAutomationPlayWright.ParishPages
                 $"//table[@id='tblBilling']/tbody/tr[td[11][contains(normalize-space(.), '{latestDate:MM/dd/yyyy}')]]"
             ).First;
 
-            await latestRow.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
+            await latestRow.WaitForAsync(new LocatorWaitForOptions
+            {
+                Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+            });
 
             // ✅ Extract columns using nth-child (safe CSS format)
             string ticketId = (await latestRow.Locator("td:nth-child(1)").InnerTextAsync()).Trim();
