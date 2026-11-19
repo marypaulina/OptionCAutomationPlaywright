@@ -136,9 +136,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator Report911Value => _page.Locator("//tfoot//td[2]");
         public ILocator Table => _page.Locator("//*[@id='DataTables_Table_0']");
         public ILocator Table911 => _page.Locator("//*[@id='Table3']");
-        private ILocator Report911Total => _page.Locator(
+        private ILocator Report911ReportTables => _page.Locator(
             "//table[.//thead//th[normalize-space()='Funding Date'] " +
-            "and .//tbody/tr and .//tfoot]//tfoot/td[2]");
+            "and .//tbody/tr and .//tfoot]");
+        private ILocator Report911Total => Report911ReportTables.Locator("tfoot td:nth-child(2)");
+        private ILocator Report911FooterCells => Report911ReportTables.Locator("tfoot td");
         public ILocator ReportResult => _page.Locator("//*[@id='export-content']");
         public ILocator RecordLength => _page.Locator("//*[@class='form-control input-xsmall input-inline']");
         public ILocator AllRecord => _page.Locator("//*[@class='form-control input-xsmall input-inline']//option[@value='-1']");
@@ -769,14 +771,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             foreach (var footerText in await Report911Total.AllTextContentsAsync())
             {
                 var candidate = footerText.Trim();
-                if (decimal.TryParse(
-                        candidate,
-                        NumberStyles.Currency,
-                        CultureInfo.GetCultureInfo("en-US"),
-                        out rangeAmount))
+                if (TryParseReport911Amount(candidate, out rangeAmount))
                 {
                     amountText = candidate;
                     break;
+                }
+            }
+
+            if (amountText == null)
+            {
+                var footerAmounts = new HashSet<decimal>();
+                foreach (var footerText in await Report911FooterCells.AllTextContentsAsync())
+                {
+                    if (TryParseReport911Amount(footerText.Trim(), out var footerAmount))
+                        footerAmounts.Add(footerAmount);
+                }
+
+                if (footerAmounts.Count == 1)
+                {
+                    rangeAmount = footerAmounts.Single();
+                    amountText = rangeAmount.ToString(CultureInfo.InvariantCulture);
                 }
             }
 
@@ -793,6 +807,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                                 className: candidate.className,
                                 rowCount: candidate.querySelectorAll('tbody tr').length,
                                 footerCount: candidate.querySelectorAll('tfoot').length,
+                                footerCellTexts: Array.from(candidate.querySelectorAll('tfoot td'),
+                                    cell => cell.textContent.trim()),
                                 headers: Array.from(candidate.querySelectorAll('thead th'),
                                     cell => cell.textContent.trim())
                             })),
@@ -823,6 +839,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         })(),
                         footerCount: table.querySelectorAll('tfoot').length,
                         footerCellCount: table.querySelectorAll('tfoot td').length,
+                        footerCellTexts: Array.from(table.querySelectorAll('tfoot td'),
+                            cell => cell.textContent.trim()),
                         totalLabelCount: Array.from(table.querySelectorAll('td, th'))
                             .filter(cell => /^\s*total\s*:?\s*$/i.test(cell.textContent)).length,
                         dataTablesApiInfo: (() => {
@@ -840,6 +858,19 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
 
             return new Report911RangeResult(rangeAmount, bodyRowCount, false, null);
+        }
+
+        private static bool TryParseReport911Amount(string text, out decimal amount)
+        {
+            var culture = CultureInfo.GetCultureInfo("en-US");
+            if (decimal.TryParse(text, NumberStyles.Currency, culture, out amount))
+                return true;
+
+            var match = System.Text.RegularExpressions.Regex.Match(
+                text,
+                @"\(?-?\$?\s*(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2}\)?");
+            return match.Success
+                && decimal.TryParse(match.Value, NumberStyles.Currency, culture, out amount);
         }
 
         private static bool IsDateValue(DateTime expectedDate, string actualValue)
@@ -1269,8 +1300,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // 3. ACCOUNT CREATED DETAILS AND PAYMENT TYPE COUNT
                 // --------------------------------------------------
 
-                string yesterdayString = DateTime.Now.AddDays(-1).ToString("MM/dd/yyyy");
-
                 long creditCardCount = 0;
                 long eCheckCount = 0;
 
@@ -1289,24 +1318,22 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                         var nameText = (await row.Locator("td:nth-of-type(4)").InnerTextAsync()).Trim();
 
-                        if (DateTime.TryParse(dateText, out DateTime dateParsed))
+                        if (IsNewOrInProgressStatus(status))
                         {
-                            string dateFormatted = dateParsed.ToString("MM/dd/yyyy");
+                            string accountStatus =
+                                $"Name: {nameText} ; Date: {dateText} ; " +
+                                $"Status: {status} ; Account Type: {typeText} ;";
 
-                            if (status.Contains("In Progress") || dateFormatted == yesterdayString)
+                            await using (StreamWriter writer = new StreamWriter(path, true))
                             {
-                                string accountStatus =
-                                    $"Name: {nameText} ; Date: {dateText} ; " +
-                                    $"Status: {status} ; Account Type: {typeText} ;";
-
-                                await using (StreamWriter writer = new StreamWriter(path, true))
-                                {
-                                    await writer.WriteLineAsync(accountStatus);
-                                }
-
-                                objreport.AccountStatus += accountStatus + "\n";
+                                await writer.WriteLineAsync(accountStatus);
                             }
 
+                            objreport.AccountStatus += accountStatus + "\n";
+                        }
+
+                        if (DateTime.TryParse(dateText, out _))
+                        {
                             if (typeText.Equals("Credit Card", StringComparison.OrdinalIgnoreCase))
                             {
                                 creditCardCount++;
@@ -1481,6 +1508,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
                 throw;
             }
+        }
+
+        private static bool IsNewOrInProgressStatus(string status)
+        {
+            var normalizedStatus = string.Concat(status.Where(character => !char.IsWhiteSpace(character)));
+            return normalizedStatus.Equals("New", StringComparison.OrdinalIgnoreCase)
+                || normalizedStatus.Equals("InProgress", StringComparison.OrdinalIgnoreCase);
         }
 
         private void LogToFile(string message)
@@ -1960,17 +1994,20 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             await ChkAlumniDisableduser.ClickAsync();
             await WaitForLoadingOverlayToDisappearAsync();
             await TxtReference.ClearAsync();
-            // Get today's and yesterday's date
+            // The ledger filters by calendar date, so include both dates touched by the previous 24 hours.
             DateTime today = DateTime.Today;
             DateTime yesterday = today.AddDays(-1);
             string startDate = yesterday.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+            string endDate = today.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
             await SetDateInputValueAsync(TxtStartDate, yesterday, "ledger start");
             string selectedDate = await TxtStartDate.InputValueAsync();
+            await SetDateInputValueAsync(TxtEndDate, today, "ledger end");
+            string selectedEndDate = await TxtEndDate.InputValueAsync();
 
-            Console.WriteLine($"Expected Start Date: {startDate}, Selected Start Date: {selectedDate}");
-
-
+            Console.WriteLine(
+                $"Expected ledger date range: {startDate} - {endDate}, " +
+                $"selected: {selectedDate} - {selectedEndDate}");
 
             // Check if the school ledger has family or user drop-down
             bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
@@ -2135,42 +2172,29 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             ledgerPayments.TotalCharges = string.IsNullOrEmpty(getDebit) ? "0" : getDebit;
             var table = await _page.QuerySelectorAsync("#tblLedger"); // Find the ledger table
             if (table == null) return ledgerPayments; // Return if table is not found
-            var rows = await _page.QuerySelectorAllAsync("#tblLedger tr"); // Get all table rows
-            int rowCount = rows.Count;
             string ccAmount = "0";
             string eCheckAmount = "0";
-            decimal totalMMPayment = 0;
-            if (rowCount > 2)
-            {
-                await DdlPaymentMethod.WaitForAsync();
-                await DdlPaymentMethod.ClickAsync();
-                await SelectCreditCard.WaitForAsync();
-                await SelectCreditCard.ClickAsync();
-                await BtnLedgerFilter.WaitForAsync();
-                await BtnLedgerFilter.ClickAsync();
-                await WaitForLoadingOverlayToDisappearAsync();
-                bool isLedgerRowsExistCheck = (await _page.QuerySelectorAsync("//*[@id='tblLedger_wrapper']/div[2]/div/div[3]/div/table/tfoot/tr[1]/td[1]")) != null;
-                if (isLedgerRowsExistCheck)
-                {
-                    bool isElementPresent = (await _page.Locator("//*[@id='tblLedger_wrapper']/div[2]/div/div[3]/div/table/tfoot/tr[1]/td[1]").CountAsync()) > 0;
-                    // Get the total payments text
-                    string getCredit2 = (await LblTotalCredit.InnerTextAsync())?.Trim();
-                    getCredit2 = string.IsNullOrEmpty(getCredit2) ? "0" : getCredit2;
-                    // Assign to eCheckAmount
-                    eCheckAmount = string.IsNullOrEmpty(getCredit2) ? "0" : getCredit2;
-                    // Convert and calculate total payment
-                    totalMMPayment =
-                        (string.IsNullOrEmpty(ccAmount) ? 0 : Convert.ToDecimal(ccAmount.Replace("$", ""))) +
-                        (string.IsNullOrEmpty(eCheckAmount) ? 0 : Convert.ToDecimal(eCheckAmount.Replace("$", "")));
-                }
-                else
-                {
-                    eCheckAmount = "0.00";
-                    totalMMPayment =
-                        (string.IsNullOrEmpty(ccAmount) ? 0 : Convert.ToDecimal(ccAmount.Replace("$", ""))) +
-                        (string.IsNullOrEmpty(eCheckAmount) ? 0 : Convert.ToDecimal(eCheckAmount.Replace("$", "")));
-                }             
-            }
+            const string creditFooterSelector =
+                "//*[@id='tblLedger_wrapper']/div[2]/div/div[3]/div/table/tfoot/tr[1]/td[1]";
+
+            await DdlPaymentMethod.WaitForAsync();
+            await DdlPaymentMethod.ClickAsync();
+            await SelectCreditCard.WaitForAsync();
+            await SelectCreditCard.ClickAsync();
+            await BtnLedgerFilter.WaitForAsync();
+            await BtnLedgerFilter.ClickAsync();
+            await WaitForLoadingOverlayToDisappearAsync();
+            ccAmount = await GetLedgerAmountAsync(creditFooterSelector, creditFooterSelector);
+
+            await DdlPaymentMethod.ClickAsync();
+            await SelecteCheck.WaitForAsync();
+            await SelecteCheck.ClickAsync();
+            await BtnLedgerFilter.ClickAsync();
+            await WaitForLoadingOverlayToDisappearAsync();
+            eCheckAmount = await GetLedgerAmountAsync(creditFooterSelector, creditFooterSelector);
+
+            decimal totalMMPayment = ParseLedgerAmount(ccAmount) + ParseLedgerAmount(eCheckAmount);
+
             using (StreamWriter writer = new StreamWriter(path, true))
             {
                 writer.WriteLine("Total Credit Card Payments(Last 24 hrs): " + ccAmount + "\r\n" + "Total eCheck Payments(Last 24 hrs): " + eCheckAmount + "\r\n" + "Total MM Payment(Last 24 hrs) : " + totalMMPayment + "\r\n");
@@ -2179,6 +2203,20 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             ledgerPayments.eCheckPayment = eCheckAmount;
             ledgerPayments.TotalPayment = totalMMPayment.ToString();
             return ledgerPayments;
+        }
+
+        private static decimal ParseLedgerAmount(string amount)
+        {
+            if (decimal.TryParse(
+                    amount,
+                    NumberStyles.Currency,
+                    CultureInfo.GetCultureInfo("en-US"),
+                    out var parsedAmount))
+            {
+                return parsedAmount;
+            }
+
+            throw new FormatException($"Could not parse ledger payment amount '{amount}'.");
         }
         #endregion
 

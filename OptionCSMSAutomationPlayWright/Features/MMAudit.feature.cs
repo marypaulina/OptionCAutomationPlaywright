@@ -136,6 +136,36 @@ this.ScenarioInitialize(scenarioInfo);
                 table2.AddRow(new string[] {
                             "142",
                             "05/22/2026"});
+                table2.AddRow(new string[] {
+                            "7296",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8417",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8369",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8407",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8188",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8232",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8545",
+                            "06/14/2026"});
+                table2.AddRow(new string[] {
+                            "8235",
+                            "06/26/2026"});
+                table2.AddRow(new string[] {
+                            "6904",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8351",
+                            "06/22/2026"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden
