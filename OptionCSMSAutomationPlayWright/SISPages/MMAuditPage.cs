@@ -1230,14 +1230,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // 1. TOTAL PRIMARY ACCOUNTS
                 // --------------------------------------------------
 
-                var primaryRows = await _page.Locator(
-                    "//table[@id='tblParentAccountSetup']/tbody/tr").CountAsync();
-
-                var emptyRows = await _page.Locator(
-                    "//*[@id='tblParentAccountSetup']/tbody/tr/td[contains(@class,'dataTables_empty')]").CountAsync();
-
-                objreport.TotalPrimaryAccount =
-                    emptyRows == 1 ? "0" : primaryRows.ToString();
+                var primaryRows = await GetParentAccountRowCountAsync();
+                objreport.TotalPrimaryAccount = primaryRows.ToString();
 
                 await using (StreamWriter writer = new StreamWriter(path, true))
                 {
@@ -1281,14 +1275,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 await WaitForLoadingOverlayToDisappearAsync();
 
                 // Fetch Account Created row count
-                var totalAccountsCreated = await _page.Locator(
-                    "//table[@id='tblParentAccountSetup']/tbody/tr").CountAsync();
-
-                var emptyRows1 = await _page.Locator(
-                    "//*[@id='tblParentAccountSetup']/tbody/tr/td[contains(@class,'dataTables_empty')]").CountAsync();
-
-                objreport.TotalAccountCreated =
-                    emptyRows1 == 1 ? "0" : totalAccountsCreated.ToString();
+                var totalAccountsCreated = await GetParentAccountRowCountAsync();
+                objreport.TotalAccountCreated = totalAccountsCreated.ToString();
 
                 await using (StreamWriter writer = new StreamWriter(path, true))
                 {
@@ -1303,45 +1291,22 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 long creditCardCount = 0;
                 long eCheckCount = 0;
 
-                if (emptyRows1 != 1)
+                if (totalAccountsCreated > 0)
                 {
                     var rows = await _page.Locator(
                         "//table[@id='tblParentAccountSetup']/tbody/tr").AllAsync();
 
                     foreach (var row in rows)
                     {
-                        var status = (await row.Locator("td:nth-of-type(7)").InnerTextAsync()).Trim();
-
-                        var dateText = (await row.Locator("td:nth-of-type(8)").InnerTextAsync()).Trim();
-
                         var typeText = (await row.Locator("td:nth-of-type(6)").InnerTextAsync()).Trim();
 
-                        var nameText = (await row.Locator("td:nth-of-type(4)").InnerTextAsync()).Trim();
-
-                        if (IsNewOrInProgressStatus(status))
+                        if (typeText.Equals("Credit Card", StringComparison.OrdinalIgnoreCase))
                         {
-                            string accountStatus =
-                                $"Name: {nameText} ; Date: {dateText} ; " +
-                                $"Status: {status} ; Account Type: {typeText} ;";
-
-                            await using (StreamWriter writer = new StreamWriter(path, true))
-                            {
-                                await writer.WriteLineAsync(accountStatus);
-                            }
-
-                            objreport.AccountStatus += accountStatus + "\n";
+                            creditCardCount++;
                         }
-
-                        if (DateTime.TryParse(dateText, out _))
+                        else if (typeText.Equals("eCheck", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (typeText.Equals("Credit Card", StringComparison.OrdinalIgnoreCase))
-                            {
-                                creditCardCount++;
-                            }
-                            else if (typeText.Equals("eCheck", StringComparison.OrdinalIgnoreCase))
-                            {
-                                eCheckCount++;
-                            }
+                            eCheckCount++;
                         }
                     }
                 }
@@ -1355,6 +1320,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         $"Total CC Accounts Created: {creditCardCount}\r\n" +
                         $"Total eCheck Accounts Created: {eCheckCount}");
                 }
+
+                await CollectNewOrInProgressAccountsAsync(objreport);
 
                 // --------------------------------------------------
                 // 4. ACCOUNT HISTORY - ACTIVATED IN LAST 24 HOURS
@@ -1512,9 +1479,133 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         private static bool IsNewOrInProgressStatus(string status)
         {
-            var normalizedStatus = string.Concat(status.Where(character => !char.IsWhiteSpace(character)));
-            return normalizedStatus.Equals("New", StringComparison.OrdinalIgnoreCase)
-                || normalizedStatus.Equals("InProgress", StringComparison.OrdinalIgnoreCase);
+            var normalizedStatus = string.Concat(status.Where(char.IsLetterOrDigit));
+            return normalizedStatus.StartsWith("New", StringComparison.OrdinalIgnoreCase)
+                || normalizedStatus.StartsWith("InProgress", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task CollectNewOrInProgressAccountsAsync(Report report)
+        {
+            if (!await AccountCreatedRadio.IsCheckedAsync())
+            {
+                throw new InvalidOperationException(
+                    "The Account Created report must be selected before reading account statuses.");
+            }
+
+            var table = _page.Locator("#tblParentAccountSetup");
+            await table.WaitForAsync(
+                new()
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                });
+
+            var headerTexts = await table.Locator("thead th").AllInnerTextsAsync();
+            var statusColumn = FindAccountColumn(headerTexts, "status", 6);
+            if (statusColumn < 0)
+            {
+                throw new InvalidOperationException(
+                    $"The Account Created report does not expose a sortable Status column. " +
+                    $"Available columns: {string.Join(" | ", headerTexts)}");
+            }
+
+            var statusHeader = table.Locator("thead th").Nth(statusColumn);
+            var sortOrder = await statusHeader.GetAttributeAsync("aria-sort");
+            if (!string.Equals(sortOrder, "ascending", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(sortOrder, "descending", StringComparison.OrdinalIgnoreCase))
+            {
+                await statusHeader.ClickAsync();
+                await WaitForLoadingOverlayToDisappearAsync();
+                sortOrder = await statusHeader.GetAttributeAsync("aria-sort");
+            }
+
+            if (!string.Equals(sortOrder, "ascending", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(sortOrder, "descending", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    "The Account Created report's Status column could not be sorted.");
+            }
+
+            var nameColumn = FindAccountColumn(headerTexts, "name", 3);
+            var typeColumn = FindAccountColumn(headerTexts, "type", 5);
+            var dateColumn = FindAccountColumn(headerTexts, "date", 7);
+            var rows = table.Locator("tbody tr");
+            var rowCount = await rows.CountAsync();
+            var matchingAccountCount = 0;
+
+            for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
+            {
+                var row = rows.Nth(rowIndex);
+                if (await row.Locator("td.dataTables_empty").CountAsync() > 0)
+                {
+                    continue;
+                }
+
+                var cells = row.Locator("td");
+                var status = (await cells.Nth(statusColumn).InnerTextAsync()).Trim();
+                if (!IsNewOrInProgressStatus(status))
+                {
+                    continue;
+                }
+
+                var name = (await cells.Nth(nameColumn).InnerTextAsync()).Trim();
+                var date = (await cells.Nth(dateColumn).InnerTextAsync()).Trim();
+                var accountType = (await cells.Nth(typeColumn).InnerTextAsync()).Trim();
+                var accountStatus =
+                    $"Name: {name} ; Date: {date} ; Status: {status} ; Account Type: {accountType} ;";
+
+                await File.AppendAllTextAsync(path, accountStatus + Environment.NewLine);
+                report.AccountStatus += accountStatus + Environment.NewLine;
+                matchingAccountCount++;
+            }
+
+            Console.WriteLine(
+                $"New/InProgress accounts found in Account Created report: {matchingAccountCount}");
+        }
+
+        private static int FindAccountColumn(
+            IReadOnlyList<string> headers,
+            string headerToken,
+            int fallbackIndex)
+        {
+            for (var index = 0; index < headers.Count; index++)
+            {
+                if (headers[index].Contains(headerToken, StringComparison.OrdinalIgnoreCase))
+                {
+                    return index;
+                }
+            }
+
+            if (fallbackIndex >= 0 && fallbackIndex < headers.Count)
+            {
+                return fallbackIndex;
+            }
+
+            return -1;
+        }
+
+        private async Task<int> GetParentAccountRowCountAsync()
+        {
+            var table = _page.Locator("#tblParentAccountSetup");
+            await table.WaitForAsync(
+                new()
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                });
+
+            return await table.EvaluateAsync<int>(
+                @"table => {
+                    const jquery = window.jQuery;
+                    if (jquery && jquery.fn && jquery.fn.dataTable &&
+                        jquery.fn.dataTable.isDataTable(table)) {
+                        return jquery(table).DataTable().page.info().recordsDisplay;
+                    }
+
+                    return Array.from(table.querySelectorAll('tbody tr'))
+                        .filter(row => !row.querySelector('td.dataTables_empty'))
+                        .length;
+                }");
         }
 
         private void LogToFile(string message)
