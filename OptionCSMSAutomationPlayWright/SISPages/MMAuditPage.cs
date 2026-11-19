@@ -52,20 +52,25 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             "8400",
             "Piqua Catholic School",
             "142",
-            "Immaculate Conception Catholic School"
+            "Immaculate Conception Catholic School",
+            "7285",
+            "Saint Patrick Catholic School - Hudson"
         };
 
         private IPage _page;
         private WaitHelper waitHelper;
         private readonly string directoryPath = "D:\\File";
+        private readonly int auditOutputNumber;
+        private readonly string auditWorkbookPath;
         public string path = string.Empty;
 
         public MMAuditPages(IPage page, WaitHelper waitHelper) : base(page)
         {         
             _page = page;
             this.waitHelper = waitHelper;
-            path = Path.Combine(directoryPath, "Audit Summary.txt");
-
+            auditOutputNumber = GetNextAvailableAuditOutputNumber(directoryPath);
+            path = Path.Combine(directoryPath, $"{auditOutputNumber} Audit Summary.txt");
+            auditWorkbookPath = Path.Combine(directoryPath, $"{auditOutputNumber} AuditSummary.xlsx");
         }
 
         #region Xpath Elements
@@ -204,12 +209,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 Directory.CreateDirectory(directoryPath);
             }
 
-            // Check if the file exists
-            if (!File.Exists(path))
+            using (new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                File.Create(path).Dispose(); // Ensure the file is properly closed after creation
             }
-            await File.WriteAllTextAsync(path, string.Empty);
             await TxtAcuUserName.FillAsync(username);
             await TxtAcuPassword.FillAsync(password);
             await BtnAcuLogin.ClickAsync();
@@ -1245,34 +1247,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // 2. ACCOUNT CREATED REPORT
                 // --------------------------------------------------
 
-                await AccountCreatedRadio.WaitForAsync(
-                    new() { State = WaitForSelectorState.Visible });
-                await AccountCreatedRadio.ClickAsync();
-
-                Console.WriteLine("Account Created Radio button clicked.");
-
-                await EnsureShowStaffCheckedAsync();
-                if (await BtnRunReport.IsEnabledAsync())
-                {
-                    await BtnRunReport.ClickAsync(new()
-                    {
-                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
-                    });
-
-                    Console.WriteLine("Run Report clicked for Account Created.");
-                    await WaitForLoadingOverlayToDisappearAsync();
-                }
-                else
-                {
-                    throw new Exception("Run Report button is disabled for Account Created.");
-                }
-
-                // Display all records again
-                if (await RecordLength.IsVisibleAsync())
-                {
-                    await RecordLength.SelectOptionAsync("-1");
-                }
-                await WaitForLoadingOverlayToDisappearAsync();
+                await RunAccountCreatedReportAsync();
 
                 // Fetch Account Created row count
                 var totalAccountsCreated = await GetParentAccountRowCountAsync();
@@ -1488,8 +1463,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             if (!await AccountCreatedRadio.IsCheckedAsync())
             {
-                throw new InvalidOperationException(
-                    "The Account Created report must be selected before reading account statuses.");
+                await RunAccountCreatedReportAsync();
             }
 
             var table = _page.Locator("#tblParentAccountSetup");
@@ -1561,6 +1535,38 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             Console.WriteLine(
                 $"New/InProgress accounts found in Account Created report: {matchingAccountCount}");
+        }
+
+        private async Task RunAccountCreatedReportAsync()
+        {
+            await AccountCreatedRadio.WaitForAsync(
+                new()
+                {
+                    State = WaitForSelectorState.Visible,
+                    Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                });
+
+            if (!await AccountCreatedRadio.IsCheckedAsync())
+            {
+                await AccountCreatedRadio.ClickAsync();
+            }
+
+            await EnsureShowStaffCheckedAsync();
+            if (!await BtnRunReport.IsEnabledAsync())
+            {
+                throw new InvalidOperationException(
+                    "Run Report is disabled for the Account Created report.");
+            }
+
+            await BtnRunReport.ClickAsync(
+                new() { Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+            await WaitForLoadingOverlayToDisappearAsync();
+
+            if (await RecordLength.IsVisibleAsync())
+            {
+                await RecordLength.SelectOptionAsync("-1");
+                await WaitForLoadingOverlayToDisappearAsync();
+            }
         }
 
         private static int FindAccountColumn(
@@ -1849,15 +1855,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             await SchoolName.WaitForAsync(); // Wait for the school name element to be present
             string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";
-            //long finalRow = tab + 4;
-            string filePath = Path.Combine(directoryPath, "AuditSummary.xlsx");
+            string filePath = auditWorkbookPath;
             if (!Directory.Exists(directoryPath))
             {
                 Directory.CreateDirectory(directoryPath);
-            }
-            if (File.Exists(filePath) && tab == 0)
-            {
-                File.Delete(filePath);
             }
             using (ExcelPackage package = new ExcelPackage(new FileInfo(filePath)))
             {
@@ -1884,49 +1885,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Columns[18].Width = 10;
                 workSheet.Columns[19].Width = 10;
                 workSheet.Columns[20].Width = 63;
-                workSheet.Columns[21].Width = 65;             
+                workSheet.Columns[21].Width = 65;
+                int totalSchools = count > 0 ? checked((int)count) : tab + 1;
                 int lastRow = tab + 2;
-                int headerRow = 1;
-                int dataStartRow = 2 + tab;
-                int finalRow = dataStartRow + 2;
-                // Define Column Headers (if it's a new sheet)
-                if (workSheet.Dimension == null || workSheet.Dimension.Rows == 0)
-                {
-                    string[] headers = {
-                        "#",
-                        "School Name",
-                        "Date From",
-                        "CC Total Amount (Dashboard)",
-                        "eCheck Total Amount (Dashboard)",
-                        "Total Amount (Dashboard)",
-                        "Last Charges (Last 24 hrs)",
-                        "Last Payment using MM (Last 24 hrs)",
-                        "CC Amount in New Status (904)",
-                        "eCheck Amount in New Status (901)",
-                        "Service Fee Amount",
-                        "CC Amt Funded (905) as on today",
-                        "eCheck Amt Funded (902) as on today",
-                        "Tot Amt Funded (911) as on today",
-                        "Total Primary Acc.",
-                        "Total Acc. Created",
-                        "Total CC Acc. Created",
-                        "Total eCheck Acc. Created",
-                        "Acts Activated (Last 24 hrs)",
-                        "New/ InProgress Account",
-                        "Funding Amount vs Transaction Amount (902 & 905)"
-                    };
-                    for (int i = 0; i < headers.Length; i++)
-                    {
-                        var cell = workSheet.Cells[headerRow, i + 1];
-                        cell.Value = headers[i];
-                        cell.Style.Font.Bold = true;
-                        cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
-                        cell.Style.Fill.BackgroundColor.SetColor(Color.DarkOliveGreen);
-                        cell.Style.Font.Color.SetColor(Color.White);
-                        cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
-                        cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
-                    }
-                }
+                int finalRow = totalSchools + 3;
+                EnsureAuditHeaders(workSheet);
                 // Assigning values
                 workSheet.Cells[$"A{lastRow}"].Value = tab + 1;
                 workSheet.Cells[$"B{lastRow}"].Value = getSchoolName;
@@ -1975,7 +1938,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 foreach (char column in "DEFGHIJKLMNOPQR")
                 {
                     string cellAddress = $"{column}{finalRow - 1}";
-                    workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{finalRow - 2})";
+                    workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{totalSchools + 1})";
 
                     if ("OPQR".Contains(column))
                     {
@@ -2012,9 +1975,126 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 package.Save();
             }
         }
+
+        public async Task RecordSchoolAuditFailureAsync(
+            int tab,
+            long schoolCount,
+            string schoolIdentifier,
+            string startDate,
+            Exception exception)
+        {
+            string errorMessage = string.Join(
+                " ",
+                (exception.Message ?? exception.GetType().Name)
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries));
+            await File.AppendAllTextAsync(
+                path,
+                $"AUDIT FAILED - School: {schoolIdentifier}; Start date: {startDate}; Error: {errorMessage}{Environment.NewLine}");
+
+            int totalSchools = schoolCount > 0 ? checked((int)schoolCount) : tab + 1;
+            using (ExcelPackage package = new ExcelPackage(new FileInfo(auditWorkbookPath)))
+            {
+                ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2026-2027")
+                                              ?? package.Workbook.Worksheets.Add("2026-2027");
+                EnsureAuditHeaders(workSheet);
+
+                int row = tab + 2;
+                workSheet.Cells[$"A{row}"].Value = tab + 1;
+                workSheet.Cells[$"B{row}"].Value = schoolIdentifier;
+                workSheet.Cells[$"C{row}"].Value = startDate;
+                workSheet.Cells[$"U{row}"].Value = $"FAILED: {errorMessage}";
+                workSheet.Cells[$"U{row}"].Style.Font.Color.SetColor(Color.Red);
+
+                int finalRow = totalSchools + 3;
+                workSheet.Cells[$"C{finalRow - 1}"].Value = "Sub Total: ";
+                foreach (char column in "DEFGHIJKLMNOPQR")
+                {
+                    string cellAddress = $"{column}{finalRow - 1}";
+                    workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{totalSchools + 1})";
+                }
+                workSheet.Cells[$"C{finalRow}"].Value = "Grand Total: ";
+                workSheet.Cells[$"D{finalRow}"].Formula = $"=F{finalRow - 1}";
+                package.Save();
+            }
+        }
+
+        public Task CreateAuditOutputCheckpointAsync()
+        {
+            int checkpointNumber = GetNextAvailableAuditOutputNumber(directoryPath);
+            File.Copy(path, Path.Combine(directoryPath, $"{checkpointNumber} Audit Summary.txt"), false);
+            File.Copy(auditWorkbookPath, Path.Combine(directoryPath, $"{checkpointNumber} AuditSummary.xlsx"), false);
+            return Task.CompletedTask;
+        }
+
+        public Task LogAuditIssueAsync(string message)
+        {
+            return File.AppendAllTextAsync(path, $"{message}{Environment.NewLine}");
+        }
         #endregion
 
         #region Private Conversion Methods and Reusable methods
+
+        private static int GetNextAvailableAuditOutputNumber(string outputDirectory)
+        {
+            if (!Directory.Exists(outputDirectory))
+            {
+                return 1;
+            }
+
+            int number = 1;
+            while (File.Exists(Path.Combine(outputDirectory, $"{number} Audit Summary.txt"))
+                || File.Exists(Path.Combine(outputDirectory, $"{number} AuditSummary.xlsx"))
+                || Directory.GetFiles(outputDirectory, $"{number} Audit Summary*.txt").Length > 0
+                || Directory.GetFiles(outputDirectory, $"{number} AuditSummary*.xlsx").Length > 0)
+            {
+                number++;
+            }
+
+            return number;
+        }
+
+        private static void EnsureAuditHeaders(ExcelWorksheet workSheet)
+        {
+            if (workSheet.Dimension != null && workSheet.Dimension.Rows > 0)
+            {
+                return;
+            }
+
+            string[] headers = {
+                "#",
+                "School Name",
+                "Date From",
+                "CC Total Amount (Dashboard)",
+                "eCheck Total Amount (Dashboard)",
+                "Total Amount (Dashboard)",
+                "Last Charges (Last 24 hrs)",
+                "Last Payment using MM (Last 24 hrs)",
+                "CC Amount in New Status (904)",
+                "eCheck Amount in New Status (901)",
+                "Service Fee Amount",
+                "CC Amt Funded (905) as on today",
+                "eCheck Amt Funded (902) as on today",
+                "Tot Amt Funded (911) as on today",
+                "Total Primary Acc.",
+                "Total Acc. Created",
+                "Total CC Acc. Created",
+                "Total eCheck Acc. Created",
+                "Acts Activated (Last 24 hrs)",
+                "New/ InProgress Account",
+                "Funding Amount vs Transaction Amount (902 & 905)"
+            };
+            for (int i = 0; i < headers.Length; i++)
+            {
+                var cell = workSheet.Cells[1, i + 1];
+                cell.Value = headers[i];
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                cell.Style.Fill.BackgroundColor.SetColor(Color.DarkOliveGreen);
+                cell.Style.Font.Color.SetColor(Color.White);
+                cell.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
+                cell.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+            }
+        }
 
         // Helper Methods for Safe Conversion
         private decimal ConvertToDecimal(string value)
@@ -2080,11 +2160,27 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public async Task<LedgerPayments> GetChargesPaymentsAsync()
         {
             LedgerPayments ledgerPayments = new LedgerPayments();
-            // Wait for the alumni disabled user checkbox and click it
-            await ChkAlumniDisableduser.WaitForAsync();
+            await ChkAlumniDisableduser.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
             await ChkAlumniDisableduser.ClickAsync();
-            await WaitForLoadingOverlayToDisappearAsync();
+            await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+
+            var userScope = _page.Locator("#userdiv:visible, #familydiv:visible");
+            await userScope.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+            bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
+            if (isUser)
+            {
+                await SelectLedgerScopeAsync(DdlUser, SelectAllUsers, "(All)");
+            }
+            else
+            {
+                await SelectLedgerScopeAsync(DdlFamilyUser, SelectAll, "(All Families)");
+            }
+
+            await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
             await TxtReference.ClearAsync();
+
             // The ledger filters by calendar date, so include both dates touched by the previous 24 hours.
             DateTime today = DateTime.Today;
             DateTime yesterday = today.AddDays(-1);
@@ -2100,26 +2196,13 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 $"Expected ledger date range: {startDate} - {endDate}, " +
                 $"selected: {selectedDate} - {selectedEndDate}");
 
-            // Check if the school ledger has family or user drop-down
-            bool isUser = await _page.Locator("#userdiv").IsVisibleAsync();
-            if (isUser)
+            await BtnLedgerFilter.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+            if (!await BtnLedgerFilter.IsEnabledAsync())
             {
-                await DdlUser.WaitForAsync();
-                await DdlUser.ClickAsync();
-                await SelectAllUsers.WaitForAsync();
-                await SelectAllUsers.ClickAsync();
+                throw new InvalidOperationException("The Ledger Filter button is disabled after selecting the user scope.");
             }
-            else
-            {
-                await DdlFamilyUser.WaitForAsync();
-                await DdlFamilyUser.ClickAsync();
-                await SelectAll.WaitForAsync();
-                await SelectAll.ClickAsync();
-            }
-            // Click on the Ledger Filter button
-        
-            await BtnLedgerFilter.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-           
+
             await BtnLedgerFilter.ClickAsync();
             // Wait for the ledger table to be present
             var ledgerTableLocator = _page.Locator("#tblLedger");
@@ -2158,6 +2241,22 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             ledgerPayments = await TodaysMMPaymentsAsync(getDebit);
             return ledgerPayments;
         }
+
+        private async Task SelectLedgerScopeAsync(ILocator dropdown, ILocator allOption, string expectedSelection)
+        {
+            await dropdown.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+            await dropdown.ClickAsync();
+            await allOption.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+            await allOption.ClickAsync();
+            await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+
+            var selectedScope = _page.Locator(
+                $"//span[contains(@id, 'Users') and contains(normalize-space(.), '{expectedSelection}')]");
+            await selectedScope.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+        }
         #endregion
       
         #region Some Public common methods
@@ -2186,13 +2285,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         public async Task FinalViewAsync()
         {
-            var filePath = @"D:\File\Audit Summary.txt"; // Update with actual path
-            //D:\File\Audit Summary.txt
-
-            // Open Notepad and load the file
-            System.Diagnostics.Process.Start("notepad.exe", filePath);
-
-            // Optional delay (if needed for UI synchronization)
+            System.Diagnostics.Process.Start("notepad.exe", path);
             await Task.Delay(5000);
         }
         #endregion
