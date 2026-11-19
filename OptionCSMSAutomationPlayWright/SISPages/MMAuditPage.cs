@@ -29,8 +29,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             decimal? Amount,
             int BodyRowCount,
             bool NoRows,
-            string? Diagnostics,
-            TimeoutException? FooterWaitFailure);
+            string? Diagnostics);
 
         private static readonly HashSet<string> Report911SplitSchoolIdentifiers = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -138,8 +137,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         public ILocator Table => _page.Locator("//*[@id='DataTables_Table_0']");
         public ILocator Table911 => _page.Locator("//*[@id='Table3']");
         private ILocator Report911Total => _page.Locator(
-            "table:visible:has(thead th:text-is('Funding Date'))" +
-            ":has(tbody tr):has(tfoot) tfoot td:nth-child(2):visible");
+            "//table[.//thead//th[normalize-space()='Funding Date'] " +
+            "and .//tbody/tr and .//tfoot]//tfoot/td[2]");
         public ILocator ReportResult => _page.Locator("//*[@id='export-content']");
         public ILocator RecordLength => _page.Locator("//*[@class='form-control input-xsmall input-inline']");
         public ILocator AllRecord => _page.Locator("//*[@class='form-control input-xsmall input-inline']//option[@value='-1']");
@@ -657,8 +656,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     throw new InvalidOperationException(
                         $"Report 911 returned {rangeResult.BodyRowCount} rows for " +
                         $"{startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy} but no total appeared " +
-                        $"after retry. Table diagnostics: {rangeResult.Diagnostics}",
-                        rangeResult.FooterWaitFailure);
+                        $"after retry. Table diagnostics: {rangeResult.Diagnostics}");
                 }
 
                 if (rangeResult.NoRows)
@@ -759,34 +757,30 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
 
             if (hasNoData)
-                return new Report911RangeResult(0m, 0, true, null, null);
+                return new Report911RangeResult(0m, 0, true, null);
 
             var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
             var footerCount = await Report911Total.CountAsync();
             if (bodyRowCount == 0 && footerCount == 0)
-                return new Report911RangeResult(0m, 0, true, null, null);
+                return new Report911RangeResult(0m, 0, true, null);
 
-            TimeoutException? footerWaitFailure = null;
-            if (footerCount == 0)
+            decimal rangeAmount = 0m;
+            string? amountText = null;
+            foreach (var footerText in await Report911Total.AllTextContentsAsync())
             {
-                var remainingTimeout = Math.Max(
-                    1,
-                    MaximumUiWaitTimeoutMs - (int)reportWait.ElapsedMilliseconds);
-                try
+                var candidate = footerText.Trim();
+                if (decimal.TryParse(
+                        candidate,
+                        NumberStyles.Currency,
+                        CultureInfo.GetCultureInfo("en-US"),
+                        out rangeAmount))
                 {
-                    await WaitForLocatorWithFallbackAsync(
-                        Report911Total.First,
-                        timeout: remainingTimeout);
+                    amountText = candidate;
+                    break;
                 }
-                catch (TimeoutException ex)
-                {
-                    footerWaitFailure = ex;
-                }
-
-                footerCount = await Report911Total.CountAsync();
             }
 
-            if (footerCount == 0)
+            if (amountText == null)
             {
                 var tableDiagnostics = await Table911.EvaluateAsync<string>(
                     @"table => JSON.stringify({
@@ -842,24 +836,10 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     null,
                     bodyRowCount,
                     false,
-                    tableDiagnostics,
-                    footerWaitFailure);
+                    tableDiagnostics);
             }
 
-            var amountText =
-                (await Report911Total.First.TextContentAsync())?.Trim() ?? string.Empty;
-            if (!decimal.TryParse(
-                    amountText,
-                    NumberStyles.Currency,
-                    CultureInfo.GetCultureInfo("en-US"),
-                    out var rangeAmount))
-            {
-                throw new FormatException(
-                    $"Report 911 returned an invalid total for {startDate:MM/dd/yyyy} - " +
-                    $"{endDate:MM/dd/yyyy}: '{amountText}'.");
-            }
-
-            return new Report911RangeResult(rangeAmount, bodyRowCount, false, null, null);
+            return new Report911RangeResult(rangeAmount, bodyRowCount, false, null);
         }
 
         private static bool IsDateValue(DateTime expectedDate, string actualValue)
