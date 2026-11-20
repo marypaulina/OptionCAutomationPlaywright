@@ -2075,10 +2075,9 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // The school list varies per run, so the row is found/added by school code (never by list position).
                 ClearAuditTotals(workSheet);
                 int lastRow = GetOrAddAuditRow(workSheet, schoolCode);
-                workSheet.Cells[lastRow, 1, lastRow, 22].Clear();
+                workSheet.Cells[lastRow, 1, lastRow, 21].Clear();
                 // Assigning values
                 workSheet.Cells[$"A{lastRow}"].Value = lastRow - 1;
-                workSheet.Cells[$"V{lastRow}"].Value = schoolCode;
                 // Show the school code with the name, e.g. "Holy Trinity School - Kewaskum (7127)".
                 string codeSuffix = $"({schoolCode})";
                 workSheet.Cells[$"B{lastRow}"].Value =
@@ -2173,13 +2172,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 ClearAuditTotals(workSheet);
 
                 int row = GetOrAddAuditRow(workSheet, schoolIdentifier);
-                workSheet.Cells[row, 1, row, 22].Clear();
+                workSheet.Cells[row, 1, row, 21].Clear();
                 workSheet.Cells[$"A{row}"].Value = row - 1;
                 workSheet.Cells[$"B{row}"].Value = schoolIdentifier;
                 workSheet.Cells[$"C{row}"].Value = startDate;
                 workSheet.Cells[$"U{row}"].Value = $"FAILED: {errorMessage}";
                 workSheet.Cells[$"U{row}"].Style.Font.Color.SetColor(Color.Red);
-                workSheet.Cells[$"V{row}"].Value = schoolIdentifier;
 
                 WriteAuditTotals(workSheet);
                 package.Save();
@@ -2219,11 +2217,47 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     .Where(line => line.Length > 0));
         }
 
-        // ---- Row helpers: rows are keyed by school code (column V), so list size/order can vary per run ----
-        private const int AuditCodeColumn = 22; // V
+        // ---- Row helpers: rows are keyed by the school code shown at the end of School Name, e.g. "Name (7127)",
+        // so list size/order can vary per run. A failed row holds just the identifier in School Name. ----
+        private const int AuditLastColumn = 21; // U
 
-        private static string AuditCodeAt(ExcelWorksheet ws, int row) =>
-            (ws.Cells[row, AuditCodeColumn].Text ?? string.Empty).Trim();
+        private static string AuditCodeAt(ExcelWorksheet ws, int row)
+        {
+            // Legacy workbooks (created earlier today) still have a "School Code" column V; honour it until migrated.
+            if (string.Equals((ws.Cells[1, 22].Text ?? string.Empty).Trim(), "School Code", StringComparison.OrdinalIgnoreCase))
+            {
+                string legacy = (ws.Cells[row, 22].Text ?? string.Empty).Trim();
+                if (legacy.Length > 0) return legacy;
+            }
+
+            string name = (ws.Cells[row, 2].Text ?? string.Empty).Trim();
+            if (name.Length == 0) return string.Empty;
+            var match = System.Text.RegularExpressions.Regex.Match(name, @"\(([^()]*)\)\s*$");
+            return match.Success && match.Groups[1].Value.Trim().Length > 0
+                ? match.Groups[1].Value.Trim()
+                : name;
+        }
+
+        // Moves the code from the old "School Code" column V into School Name, then removes column V.
+        private static void MigrateLegacyCodeColumn(ExcelWorksheet ws)
+        {
+            if (!string.Equals((ws.Cells[1, 22].Text ?? string.Empty).Trim(), "School Code", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            int end = ws.Dimension?.End.Row ?? 1;
+            for (int r = 2; r <= end; r++)
+            {
+                string code = (ws.Cells[r, 22].Text ?? string.Empty).Trim();
+                if (code.Length == 0) continue;
+                string name = (ws.Cells[r, 2].Text ?? string.Empty).Trim();
+                if (name.Length == 0 || string.Equals(name, code, StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith($"({code})", StringComparison.OrdinalIgnoreCase))
+                    ws.Cells[r, 2].Value = name.Length == 0 ? code : name;
+                else
+                    ws.Cells[r, 2].Value = $"{name} ({code})";
+            }
+            ws.DeleteColumn(22);
+        }
 
         private static int LastAuditDataRow(ExcelWorksheet ws)
         {
@@ -2256,7 +2290,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 if (label.StartsWith("Sub Total", StringComparison.OrdinalIgnoreCase)
                     || label.StartsWith("Grand Total", StringComparison.OrdinalIgnoreCase))
                 {
-                    ws.Cells[r, 1, r, AuditCodeColumn].Clear();
+                    ws.Cells[r, 1, r, AuditLastColumn].Clear();
                 }
             }
         }
@@ -2324,14 +2358,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             if (workSheet.Dimension != null && workSheet.Dimension.Rows > 0)
             {
-                if (string.IsNullOrWhiteSpace(workSheet.Cells[1, 22].Text))
-                {
-                    workSheet.Cells[1, 22].Value = "School Code";
-                    workSheet.Cells[1, 22].Style.Font.Bold = true;
-                    workSheet.Cells[1, 22].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    workSheet.Cells[1, 22].Style.Fill.BackgroundColor.SetColor(Color.DarkOliveGreen);
-                    workSheet.Cells[1, 22].Style.Font.Color.SetColor(Color.White);
-                }
+                MigrateLegacyCodeColumn(workSheet);
                 return;
             }
 
@@ -2356,8 +2383,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 "Total eCheck Acc. Created",
                 "Acts Activated (Last 24 hrs)",
                 "New/ InProgress Account",
-                "Funding Amount vs Transaction Amount (902 & 905)",
-                "School Code"
+                "Funding Amount vs Transaction Amount (902 & 905)"
             };
             for (int i = 0; i < headers.Length; i++)
             {
