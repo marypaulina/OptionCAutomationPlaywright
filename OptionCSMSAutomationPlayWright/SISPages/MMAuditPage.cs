@@ -35,6 +35,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             "5158",
             "St. Joseph Marquette Catholic School",
+            "7127",
+            "Holy Trinity School - Kewaskum",
             "7291",
             "Cathedral School - Superior",
             "221",
@@ -55,6 +57,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             "Immaculate Conception Catholic School",
             "7285",
             "Saint Patrick Catholic School - Hudson"
+            
         };
 
         private IPage _page;
@@ -539,17 +542,56 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         private async Task EnsureShowStaffCheckedAsync()
         {
-            if (await StaffCheck.CountAsync() == 0)
-                return;
+            if (await StaffCheck.CountAsync() > 0)
+            {
+                var staffCheckbox = StaffCheck.First;
+                if (await staffCheckbox.IsVisibleAsync() && !await staffCheckbox.IsCheckedAsync())
+                {
+                    if (!await staffCheckbox.IsEnabledAsync())
+                        throw new InvalidOperationException("The Show Staff checkbox is visible but disabled.");
 
-            var staffCheckbox = StaffCheck.First;
-            if (!await staffCheckbox.IsVisibleAsync() || await staffCheckbox.IsCheckedAsync())
-                return;
+                    await staffCheckbox.CheckAsync();
+                    await WaitForLoadingOverlayToDisappearAsync(timeout: 15000);
+                }
+            }
 
-            if (!await staffCheckbox.IsEnabledAsync())
-                throw new InvalidOperationException("The Show Staff checkbox is visible but disabled.");
+            await EnsureShowCheckboxesCheckedAsync();
+        }
 
-            await staffCheckbox.CheckAsync();
+        // Ticks any visible, enabled, unchecked checkbox whose label starts with "Show"
+        // (e.g. "Show Staff", "Show Alumni/Disabled users"), whatever its id is.
+        private async Task EnsureShowCheckboxesCheckedAsync()
+        {
+            var boxes = _page.Locator("input[type='checkbox']:visible:not(:checked)");
+            int count = await boxes.CountAsync();
+            for (int i = 0; i < count; i++)
+            {
+                var box = boxes.Nth(i);
+                try
+                {
+                    var labelText = await box.EvaluateAsync<string>(
+                        @"el => {
+                            let t = '';
+                            if (el.id) { const l = document.querySelector('label[for=""' + el.id + '""]'); if (l) t = l.innerText; }
+                            if (!t) { const p = el.closest('label'); if (p) t = p.innerText; }
+                            if (!t && el.nextSibling) t = el.nextSibling.textContent || '';
+                            if (!t && el.nextElementSibling) t = el.nextElementSibling.innerText || '';
+                            if (!t && el.parentElement) t = el.parentElement.innerText || '';
+                            return (t || '').trim();
+                        }");
+                    if (!labelText.StartsWith("Show", StringComparison.OrdinalIgnoreCase)
+                        || !await box.IsEnabledAsync())
+                        continue;
+
+                    await box.CheckAsync();
+                    await WaitForLoadingOverlayToDisappearAsync(timeout: 15000);
+                }
+                catch (PlaywrightException)
+                {
+                    // Page re-rendered while ticking; remaining boxes are re-evaluated on the next call.
+                    break;
+                }
+            }
         }
 
         private static bool IsReport911NoDataMessage(string text)
@@ -797,6 +839,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
             return last!;
         }
+
 
         private async Task<Report911RangeResult> RunReport911AttemptAsync(
             DateTime startDate,
@@ -2360,14 +2403,46 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         #endregion
         
         #region Get Charges and Payments from the Fee Management Ledger
+        // Makes sure the "Show alumni/disabled users" checkbox is ticked, verifying the state after each
+        // click. Returns true if it had to tick it (so the caller knows the user list was reloaded).
+        private async Task<bool> EnsureAlumniDisabledCheckedAsync()
+        {
+            await ChkAlumniDisableduser.First.WaitForAsync(
+                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+
+            var input = ChkAlumniDisableduser.First.Locator("input[type='checkbox']").First;
+            var hasInput = await ChkAlumniDisableduser.First.Locator("input[type='checkbox']").CountAsync() > 0;
+            Func<Task<bool>> isChecked = async () => hasInput && await input.IsCheckedAsync();
+
+            if (!hasInput)
+            {
+                // No inspectable checkbox: keep the original single click behaviour.
+                await ChkAlumniDisableduser.First.ClickAsync();
+                await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+                return true;
+            }
+
+            bool ticked = false;
+            for (int attempt = 1; attempt <= 3 && !await isChecked(); attempt++)
+            {
+                ticked = true;
+                try { await input.CheckAsync(new() { Force = true, Timeout = 5000 }); }
+                catch (PlaywrightException) { await ChkAlumniDisableduser.First.ClickAsync(); }
+                await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+            }
+
+            if (!await isChecked())
+                throw new InvalidOperationException("The 'Show alumni/disabled users' checkbox could not be ticked on the ledger page.");
+            return ticked;
+        }
+
         // To find the total charges and payments posted for the given date range in School Ledger
         public async Task<LedgerPayments> GetChargesPaymentsAsync()
         {
             LedgerPayments ledgerPayments = new LedgerPayments();
-            await ChkAlumniDisableduser.WaitForAsync(
-                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
-            await ChkAlumniDisableduser.ClickAsync();
-            await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+            // "Show alumni/disabled users" must be ticked BEFORE choosing All / All Families,
+            // because ticking it reloads the user/family list.
+            await EnsureAlumniDisabledCheckedAsync();
 
             var userScope = _page.Locator("#userdiv:visible, #familydiv:visible");
             await userScope.WaitForAsync(
@@ -2383,6 +2458,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
 
             await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+            // A reload after the selection would untick the box and reset the list; confirm it is still ticked.
+            if (await EnsureAlumniDisabledCheckedAsync())
+            {
+                if (await _page.Locator("#userdiv").IsVisibleAsync())
+                    await SelectLedgerScopeAsync(DdlUser, SelectAllUsers, "(All)");
+                else
+                    await SelectLedgerScopeAsync(DdlFamilyUser, SelectAll, "(All Families)");
+                await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+            }
             await TxtReference.ClearAsync();
 
             // The ledger filters by calendar date, so include both dates touched by the previous 24 hours.
@@ -2392,8 +2476,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             string endDate = today.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
             await SetDateInputValueAsync(TxtStartDate, yesterday, "ledger start");
-            string selectedDate = await TxtStartDate.InputValueAsync();
             await SetDateInputValueAsync(TxtEndDate, today, "ledger end");
+            if (!IsDateValue(yesterday, await TxtStartDate.InputValueAsync()))
+                await SetDateInputValueAsync(TxtStartDate, yesterday, "ledger start");
+            if (!IsDateValue(today, await TxtEndDate.InputValueAsync()))
+                await SetDateInputValueAsync(TxtEndDate, today, "ledger end");
+            string selectedDate = await TxtStartDate.InputValueAsync();
             string selectedEndDate = await TxtEndDate.InputValueAsync();
 
             Console.WriteLine(
