@@ -40,24 +40,28 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
             var failedRows = new List<int>();
             bool aborted = false;
 
-            // If a previous run left FAILED rows in the existing output files, resume by retrying only those.
-            var resumeRows = mmPage.PrepareAuditOutputs().Where(r => r >= 0 && r < total).ToList();
-            bool resuming = resumeRows.Count > 0;
-            if (resuming)
+            // The school list is variable (any count, any order). Excel rows are keyed by school code.
+            // Schools already audited successfully today (same dated workbook) are skipped; schools that are
+            // new or marked FAILED are run. If everything listed already succeeded, all of them are refreshed.
+            var schoolCodes = auditTable.Rows.Select(r => r["SchoolCode"]).ToList();
+            var runIndexes = mmPage.PrepareAuditOutputs(schoolCodes);
+            if (runIndexes.Count != total)
             {
-                failedRows.AddRange(resumeRows);
-                await mmPage.LogAuditIssueAsync($"RESUME - existing outputs found with {resumeRows.Count} failed school(s); pass 1 skipped.");
+                await mmPage.LogAuditIssueAsync(
+                    $"RESUME - running {runIndexes.Count} of {total} listed school(s) (new or previously failed): " +
+                    string.Join(", ", runIndexes.Select(r => schoolCodes[r])));
             }
 
-            // Pass 1: every school
-            for (int i = 0; i < total && !resuming; i++)
+            // Pass 1: the schools that need to run
+            for (int n = 0; n < runIndexes.Count; n++)
             {
+                int i = runIndexes[n];
                 if (!await AuditSchoolAsync(auditTable, i, total, null))
                 {
                     failedRows.Add(i);
                 }
 
-                if (total != i + 1 && !await TryBackToAcutisAsync(auditTable.Rows[i]["SchoolCode"], failures))
+                if (n != runIndexes.Count - 1 && !await TryBackToAcutisAsync(auditTable.Rows[i]["SchoolCode"], failures))
                 {
                     aborted = true;
                     break;
@@ -128,7 +132,7 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
                 await mmPage.VerifyFeeManagementAsync(); // Open the Fee Management page
                 objreport = await mmPage.LoopFilterAsync(schoolIdentifier);// Loop through all MM reports and get values
                 await mmPage.VerifyAccountStatusAsync(objreport);// Track account status
-                await mmPage.WriteAuditReportInExcel(objreport, ledgerPayments, dashboardAmount, i, startDate, total);// Write values to Excel
+                await mmPage.WriteAuditReportInExcel(objreport, ledgerPayments, dashboardAmount, schoolIdentifier, startDate);// Write values to Excel
                 return true;
             }
             catch (Exception exception)
@@ -142,7 +146,7 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
 
                 try
                 {
-                    await mmPage.RecordSchoolAuditFailureAsync(i, total, schoolIdentifier, startDate, exception);
+                    await mmPage.RecordSchoolAuditFailureAsync(schoolIdentifier, startDate, exception);
                 }
                 catch (Exception recordException)
                 {

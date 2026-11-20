@@ -91,31 +91,15 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
 
         /// <summary>
-        /// Looks at the existing output files. If the workbook has FAILED rows, they are kept and the
-        /// zero-based school indexes to retry are returned. Otherwise the files are reset for a fresh run
-        /// and an empty list is returned.
+        /// The school list changes from run to run (1, 2, 15, 30... schools in any order), so rows in the
+        /// workbook are keyed by school code, not by list position. Returns the zero-based indexes of the
+        /// schools in <paramref name="schoolCodes"/> that still need to be audited today: those that are not in
+        /// today's workbook yet or are marked FAILED. If every listed school already succeeded today, all of them
+        /// are re-run (their rows are refreshed in place). Existing files are never deleted.
         /// </summary>
-        public List<int> PrepareAuditOutputs()
+        public List<int> PrepareAuditOutputs(IReadOnlyList<string> schoolCodes)
         {
-            // Adopt outputs from the older naming ("Audit Summary.txt", "1 Audit Summary.txt") if today's
-            // dated files don't exist yet, so an in-progress run can be resumed. Originals are left untouched.
-            if (!File.Exists(auditWorkbookPath) && Directory.Exists(directoryPath))
-            {
-                string legacyXlsx = Path.Combine(directoryPath, "AuditSummary.xlsx");
-                if (!File.Exists(legacyXlsx))
-                {
-                    legacyXlsx = Directory.GetFiles(directoryPath, "? AuditSummary.xlsx")
-                        .OrderBy(f => f).LastOrDefault();
-                }
-                if (legacyXlsx != null && File.Exists(legacyXlsx))
-                {
-                    File.Copy(legacyXlsx, auditWorkbookPath, true);
-                    string legacyTxt = legacyXlsx.Replace("AuditSummary.xlsx", "Audit Summary.txt");
-                    if (File.Exists(legacyTxt)) File.Copy(legacyTxt, path, true);
-                }
-            }
-
-            var failed = new List<int>();
+            var codeStatus = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase); // code -> failed?
             if (File.Exists(auditWorkbookPath))
             {
                 using (ExcelPackage package = new ExcelPackage(new FileInfo(auditWorkbookPath)))
@@ -125,23 +109,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                     {
                         for (int row = 2; row <= ws.Dimension.End.Row; row++)
                         {
+                            string code = AuditCodeAt(ws, row);
+                            if (code.Length == 0) continue; // totals rows or rows without a school code
                             string status = ws.Cells[$"U{row}"].Text ?? string.Empty;
-                            if (status.StartsWith("FAILED", StringComparison.OrdinalIgnoreCase)
-                                && int.TryParse(ws.Cells[$"A{row}"].Text, out int serial))
-                            {
-                                failed.Add(serial - 1);
-                            }
+                            codeStatus[code] = status.StartsWith("FAILED", StringComparison.OrdinalIgnoreCase);
                         }
                     }
                 }
             }
 
-            if (failed.Count == 0)
+            var toRun = new List<int>();
+            for (int i = 0; i < schoolCodes.Count; i++)
             {
-                if (File.Exists(path)) File.Delete(path);
-                if (File.Exists(auditWorkbookPath)) File.Delete(auditWorkbookPath);
+                string code = schoolCodes[i].Trim();
+                if (!codeStatus.TryGetValue(code, out bool failed) || failed) toRun.Add(i);
             }
-            return failed;
+            if (toRun.Count == 0)
+            {
+                toRun.AddRange(Enumerable.Range(0, schoolCodes.Count));
+            }
+            return toRun;
         }
 
         #region Xpath Elements
@@ -782,7 +769,36 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             return total;
         }
 
+        // Report 0911 can be slow or occasionally not return a result. If the result (or total) doesn't
+        // appear, click Run Report again (re-applying the date filters) up to MaxRuns times.
         private async Task<Report911RangeResult> RunReport911RangeAsync(
+            DateTime startDate,
+            DateTime endDate,
+            bool hasEditableEndDateFilter)
+        {
+            const int MaxRuns = 3;
+            Report911RangeResult? last = null;
+            for (int run = 1; run <= MaxRuns; run++)
+            {
+                try
+                {
+                    last = await RunReport911AttemptAsync(startDate, endDate, hasEditableEndDateFilter);
+                    if (last.Amount != null || last.NoRows || run == MaxRuns)
+                        return last;
+                    Console.WriteLine(
+                        $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: no total (run {run}); clicking Run Report again.");
+                }
+                catch (Exception ex) when (run < MaxRuns && (ex is TimeoutException || ex is PlaywrightException))
+                {
+                    Console.WriteLine(
+                        $"Report 911 {startDate:MM/dd/yyyy} - {endDate:MM/dd/yyyy}: not loaded (run {run}): {ex.Message.Split('\n')[0]}; clicking Run Report again.");
+                    try { await WaitForLoadingOverlayToDisappearAsync(timeout: 15000); } catch { }
+                }
+            }
+            return last!;
+        }
+
+        private async Task<Report911RangeResult> RunReport911AttemptAsync(
             DateTime startDate,
             DateTime endDate,
             bool hasEditableEndDateFilter)
@@ -859,6 +875,19 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
             var bodyRowCount = await Table911.Locator("tbody tr").CountAsync();
             var footerCount = await Report911Total.CountAsync();
+            if (bodyRowCount > 0 && footerCount == 0)
+            {
+                // Rows are shown but the total footer is still rendering; give it time.
+                try
+                {
+                    await Report911Total.First.WaitForAsync(
+                        new() { State = WaitForSelectorState.Attached, Timeout = 20000 });
+                }
+                catch (TimeoutException)
+                {
+                }
+                footerCount = await Report911Total.CountAsync();
+            }
             if (bodyRowCount == 0 && footerCount == 0)
                 return new Report911RangeResult(0m, 0, true, null);
 
@@ -1963,9 +1992,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         Report objReport,
         LedgerPayments ledgerPayments = null,
         DashboardAmount dashboardAmount = null,
-        int tab = 0,
-        string startDate = "",
-        long count = 0)
+        string schoolCode = "",
+        string startDate = "")
         {
             await SchoolName.WaitForAsync(); // Wait for the school name element to be present
             string getSchoolName = (await SchoolName.TextContentAsync())?.Trim() ?? "Unknown School";
@@ -2000,12 +2028,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Columns[19].Width = 10;
                 workSheet.Columns[20].Width = 63;
                 workSheet.Columns[21].Width = 65;
-                int totalSchools = count > 0 ? checked((int)count) : tab + 1;
-                int lastRow = tab + 2;
-                int finalRow = totalSchools + 3;
                 EnsureAuditHeaders(workSheet);
+                // The school list varies per run, so the row is found/added by school code (never by list position).
+                ClearAuditTotals(workSheet);
+                int lastRow = GetOrAddAuditRow(workSheet, schoolCode);
+                workSheet.Cells[lastRow, 1, lastRow, 22].Clear();
                 // Assigning values
-                workSheet.Cells[$"A{lastRow}"].Value = tab + 1;
+                workSheet.Cells[$"A{lastRow}"].Value = lastRow - 1;
+                workSheet.Cells[$"V{lastRow}"].Value = schoolCode;
                 workSheet.Cells[$"B{lastRow}"].Value = getSchoolName;
                 workSheet.Cells[$"C{lastRow}"].Value = startDate;
                 workSheet.Cells[$"D{lastRow}"].Value = dashboardAmount?.CCTotalAmount;
@@ -2024,8 +2054,12 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 workSheet.Cells[$"Q{lastRow}"].Value = ConvertToInt(objReport?.CreditCardCount ?? "0");
                 workSheet.Cells[$"R{lastRow}"].Value = ConvertToInt(objReport?.ECheckCount ?? "0");
                 workSheet.Cells[$"S{lastRow}"].Value = ConvertToInt(objReport?.AcctsActivatedLast24Hours ?? "0");
-                workSheet.Cells[$"T{lastRow}"].Value = objReport?.AccountStatus;
-                workSheet.Cells[$"U{lastRow}"].Value = objReport?.CompareResults;
+                // One entry per line, no blank lines and no trailing line break after the last entry.
+                workSheet.Cells[$"T{lastRow}"].Value = NormalizeMultilineCell(objReport?.AccountStatus);
+                workSheet.Cells[$"U{lastRow}"].Value = NormalizeMultilineCell(objReport?.CompareResults);
+                workSheet.Cells[$"T{lastRow}"].Style.WrapText = true;
+                workSheet.Cells[$"U{lastRow}"].Style.WrapText = true;
+                workSheet.Columns[21].Width = 105; // wide enough for each "Funding Amount ... Transaction Amount ..." line to stay on one line
                 // Apply Row Formatting
                 for (int col = 1; col <= workSheet.Dimension.Columns; col++)
                 {
@@ -2045,32 +2079,11 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // Conditional Formatting for Comparison Results
                 workSheet.Cells[$"T{lastRow}"].Style.Font.Color.SetColor(
                     objReport?.CompareResults?.Contains("are not equal") == true ? Color.Red : Color.Green);
-                // Summary Rows
-                workSheet.Cells[$"C{finalRow - 1}"].Value = "Sub Total: ";
-                workSheet.Cells[$"C{finalRow - 1}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
-
-                foreach (char column in "DEFGHIJKLMNOPQR")
-                {
-                    string cellAddress = $"{column}{finalRow - 1}";
-                    workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{totalSchools + 1})";
-
-                    if ("OPQR".Contains(column))
-                    {
-                        // Ensure whole numbers without decimals for OPQR
-                        workSheet.Cells[cellAddress].Style.Numberformat.Format = "0";
-                    }
-                    else
-                    {
-                        // Apply US currency format ($ and two decimal places) for D to N
-                        workSheet.Cells[cellAddress].Style.Numberformat.Format = "$#,##0.00";
-                    }
-                }
-                workSheet.Cells[$"C{finalRow}"].Value = "Grand Total: ";
-                workSheet.Cells[$"C{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
-                workSheet.Cells[$"D{finalRow}"].Formula = $"=F{finalRow - 1}";
+                // Summary Rows (placed right after the last school row)
+                int finalRow = WriteAuditTotals(workSheet);
                 // Formatting
                 workSheet.Cells[$"A1:T1"].Style.WrapText = true;
-                workSheet.Cells[$"R2:T{finalRow}"].Style.WrapText = true;
+                workSheet.Cells[$"R2:U{finalRow}"].Style.WrapText = true;
                 workSheet.Cells[$"A1:T{finalRow}"].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                 workSheet.Cells[$"A1:T{finalRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
                 workSheet.View.ShowGridLines = false;
@@ -2091,8 +2104,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
 
         public async Task RecordSchoolAuditFailureAsync(
-            int tab,
-            long schoolCount,
             string schoolIdentifier,
             string startDate,
             Exception exception)
@@ -2105,31 +2116,128 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 path,
                 $"AUDIT FAILED - School: {schoolIdentifier}; Start date: {startDate}; Error: {errorMessage}{Environment.NewLine}");
 
-            int totalSchools = schoolCount > 0 ? checked((int)schoolCount) : tab + 1;
             using (ExcelPackage package = new ExcelPackage(new FileInfo(auditWorkbookPath)))
             {
                 ExcelWorksheet workSheet = package.Workbook.Worksheets.FirstOrDefault(ws => ws.Name == "2026-2027")
                                               ?? package.Workbook.Worksheets.Add("2026-2027");
                 EnsureAuditHeaders(workSheet);
+                ClearAuditTotals(workSheet);
 
-                int row = tab + 2;
-                workSheet.Cells[$"A{row}"].Value = tab + 1;
+                int row = GetOrAddAuditRow(workSheet, schoolIdentifier);
+                workSheet.Cells[row, 1, row, 22].Clear();
+                workSheet.Cells[$"A{row}"].Value = row - 1;
                 workSheet.Cells[$"B{row}"].Value = schoolIdentifier;
                 workSheet.Cells[$"C{row}"].Value = startDate;
                 workSheet.Cells[$"U{row}"].Value = $"FAILED: {errorMessage}";
                 workSheet.Cells[$"U{row}"].Style.Font.Color.SetColor(Color.Red);
+                workSheet.Cells[$"V{row}"].Value = schoolIdentifier;
 
-                int finalRow = totalSchools + 3;
-                workSheet.Cells[$"C{finalRow - 1}"].Value = "Sub Total: ";
-                foreach (char column in "DEFGHIJKLMNOPQR")
-                {
-                    string cellAddress = $"{column}{finalRow - 1}";
-                    workSheet.Cells[cellAddress].Formula = $"SUM({column}2:{column}{totalSchools + 1})";
-                }
-                workSheet.Cells[$"C{finalRow}"].Value = "Grand Total: ";
-                workSheet.Cells[$"D{finalRow}"].Formula = $"=F{finalRow - 1}";
+                WriteAuditTotals(workSheet);
                 package.Save();
             }
+        }
+
+        // Trims each line, drops blank lines and joins with a single line break (no trailing blank line).
+        private static string NormalizeMultilineCell(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+            return string.Join("\n",
+                text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.Trim())
+                    .Where(line => line.Length > 0));
+        }
+
+        // ---- Row helpers: rows are keyed by school code (column V), so list size/order can vary per run ----
+        private const int AuditCodeColumn = 22; // V
+
+        private static string AuditCodeAt(ExcelWorksheet ws, int row) =>
+            (ws.Cells[row, AuditCodeColumn].Text ?? string.Empty).Trim();
+
+        private static int LastAuditDataRow(ExcelWorksheet ws)
+        {
+            int last = 1;
+            int end = ws.Dimension?.End.Row ?? 1;
+            for (int r = 2; r <= end; r++)
+            {
+                if (AuditCodeAt(ws, r).Length > 0) last = r;
+            }
+            return last;
+        }
+
+        private static int GetOrAddAuditRow(ExcelWorksheet ws, string schoolCode)
+        {
+            string code = (schoolCode ?? string.Empty).Trim();
+            int end = ws.Dimension?.End.Row ?? 1;
+            for (int r = 2; r <= end; r++)
+            {
+                if (string.Equals(AuditCodeAt(ws, r), code, StringComparison.OrdinalIgnoreCase)) return r;
+            }
+            return LastAuditDataRow(ws) + 1;
+        }
+
+        private static void ClearAuditTotals(ExcelWorksheet ws)
+        {
+            int end = ws.Dimension?.End.Row ?? 1;
+            for (int r = 2; r <= end; r++)
+            {
+                string label = (ws.Cells[r, 3].Text ?? string.Empty).Trim();
+                if (label.StartsWith("Sub Total", StringComparison.OrdinalIgnoreCase)
+                    || label.StartsWith("Grand Total", StringComparison.OrdinalIgnoreCase))
+                {
+                    ws.Cells[r, 1, r, AuditCodeColumn].Clear();
+                }
+            }
+        }
+
+        // Writes Sub Total / Grand Total right below the last school row. Returns the grand total row.
+        private static int WriteAuditTotals(ExcelWorksheet ws)
+        {
+            int lastData = LastAuditDataRow(ws);
+            int subRow = lastData + 1;
+            int grandRow = lastData + 2;
+            ws.Cells[$"C{subRow}"].Value = "Sub Total: ";
+            ws.Cells[$"C{subRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+            foreach (char column in "DEFGHIJKLMNOPQR")
+            {
+                string cellAddress = $"{column}{subRow}";
+                ws.Cells[cellAddress].Formula = $"SUM({column}2:{column}{lastData})";
+                ws.Cells[cellAddress].Style.Numberformat.Format = "OPQR".Contains(column) ? "0" : "$#,##0.00";
+            }
+            ws.Cells[$"C{grandRow}"].Value = "Grand Total: ";
+            ws.Cells[$"C{grandRow}"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
+            ws.Cells[$"D{grandRow}"].Formula = $"=F{subRow}";
+
+            // Sub Total and Grand Total rows: same back color as the data rows, bold text.
+            foreach (int totalRow in new[] { subRow, grandRow })
+            {
+                using (ExcelRange range = ws.Cells[totalRow, 1, totalRow, 21])
+                {
+                    range.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    range.Style.Fill.BackgroundColor.SetColor(Color.MintCream);
+                    range.Style.Font.Bold = true;
+                    range.Style.Font.Color.SetColor(Color.Black);
+                }
+            }
+            ws.Cells[$"D{grandRow}"].Style.Numberformat.Format = "$#,##0.00";
+
+            // Yellow highlight on the Sub Total of: Total Amount (Dashboard) F, Last Payment using MM H, Service Fee Amount K.
+            foreach (string col in new[] { "F", "H", "K" })
+            {
+                ws.Cells[$"{col}{subRow}"].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                ws.Cells[$"{col}{subRow}"].Style.Fill.BackgroundColor.SetColor(Color.Yellow);
+            }
+
+            // Acts Activated (Last 24 hrs) (column S) >= 1 is highlighted yellow.
+            for (int r = 2; r <= lastData; r++)
+            {
+                if (decimal.TryParse(ws.Cells[r, 19].Text, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal activated)
+                    && activated >= 1)
+                {
+                    ws.Cells[r, 19].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    ws.Cells[r, 19].Style.Fill.BackgroundColor.SetColor(Color.Yellow);
+                }
+            }
+            return grandRow;
         }
 
         public Task LogAuditIssueAsync(string message)
@@ -2144,6 +2252,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             if (workSheet.Dimension != null && workSheet.Dimension.Rows > 0)
             {
+                if (string.IsNullOrWhiteSpace(workSheet.Cells[1, 22].Text))
+                {
+                    workSheet.Cells[1, 22].Value = "School Code";
+                    workSheet.Cells[1, 22].Style.Font.Bold = true;
+                    workSheet.Cells[1, 22].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    workSheet.Cells[1, 22].Style.Fill.BackgroundColor.SetColor(Color.DarkOliveGreen);
+                    workSheet.Cells[1, 22].Style.Font.Color.SetColor(Color.White);
+                }
                 return;
             }
 
@@ -2168,7 +2284,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 "Total eCheck Acc. Created",
                 "Acts Activated (Last 24 hrs)",
                 "New/ InProgress Account",
-                "Funding Amount vs Transaction Amount (902 & 905)"
+                "Funding Amount vs Transaction Amount (902 & 905)",
+                "School Code"
             };
             for (int i = 0; i < headers.Length; i++)
             {
