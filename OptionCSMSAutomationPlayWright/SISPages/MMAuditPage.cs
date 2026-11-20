@@ -60,17 +60,19 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         private IPage _page;
         private WaitHelper waitHelper;
         private readonly string directoryPath = "D:\\File";
-        private readonly int auditOutputNumber;
         private readonly string auditWorkbookPath;
         public string path = string.Empty;
 
         public MMAuditPages(IPage page, WaitHelper waitHelper) : base(page)
-        {         
+        {
             _page = page;
             this.waitHelper = waitHelper;
-            auditOutputNumber = GetNextAvailableAuditOutputNumber(directoryPath);
-            path = Path.Combine(directoryPath, $"{auditOutputNumber} Audit Summary.txt");
-            auditWorkbookPath = Path.Combine(directoryPath, $"{auditOutputNumber} AuditSummary.xlsx");
+            Directory.CreateDirectory(directoryPath);
+            path = Path.Combine(directoryPath, "Audit Summary.txt");
+            auditWorkbookPath = Path.Combine(directoryPath, "AuditSummary.xlsx");
+            // One fixed pair of output files; start each run fresh.
+            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(auditWorkbookPath)) File.Delete(auditWorkbookPath);
         }
 
         #region Xpath Elements
@@ -2018,14 +2020,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             }
         }
 
-        public Task CreateAuditOutputCheckpointAsync()
-        {
-            int checkpointNumber = GetNextAvailableAuditOutputNumber(directoryPath);
-            File.Copy(path, Path.Combine(directoryPath, $"{checkpointNumber} Audit Summary.txt"), false);
-            File.Copy(auditWorkbookPath, Path.Combine(directoryPath, $"{checkpointNumber} AuditSummary.xlsx"), false);
-            return Task.CompletedTask;
-        }
-
         public Task LogAuditIssueAsync(string message)
         {
             return File.AppendAllTextAsync(path, $"{message}{Environment.NewLine}");
@@ -2033,25 +2027,6 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         #endregion
 
         #region Private Conversion Methods and Reusable methods
-
-        private static int GetNextAvailableAuditOutputNumber(string outputDirectory)
-        {
-            if (!Directory.Exists(outputDirectory))
-            {
-                return 1;
-            }
-
-            int number = 1;
-            while (File.Exists(Path.Combine(outputDirectory, $"{number} Audit Summary.txt"))
-                || File.Exists(Path.Combine(outputDirectory, $"{number} AuditSummary.xlsx"))
-                || Directory.GetFiles(outputDirectory, $"{number} Audit Summary*.txt").Length > 0
-                || Directory.GetFiles(outputDirectory, $"{number} AuditSummary*.xlsx").Length > 0)
-            {
-                number++;
-            }
-
-            return number;
-        }
 
         private static void EnsureAuditHeaders(ExcelWorksheet workSheet)
         {

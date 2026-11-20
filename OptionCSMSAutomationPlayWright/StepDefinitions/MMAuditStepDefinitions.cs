@@ -36,102 +36,136 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
         public async Task GivenOpenAllTheMMSchoolsAndAuditTheFeeDetailsEveryday(Table auditTable)
         {
             var failures = new List<Exception>();
-            for (int i = 0; i < auditTable.Rows.Count; i++)
+            int total = auditTable.Rows.Count;
+            var failedRows = new List<int>();
+            bool aborted = false;
+
+            // Pass 1: every school
+            for (int i = 0; i < total; i++)
             {
-                Report objreport = new Report();
-                LedgerPayments ledgerPayments = new LedgerPayments();
-                DashboardAmount dashboardAmount = new DashboardAmount();
-
-                string schoolIdentifier = auditTable.Rows[i]["SchoolCode"];
-                string startDate = auditTable.Rows[i]["StartDate"];
-                try
+                if (!await AuditSchoolAsync(auditTable, i, total, null))
                 {
-                    await mmPage.OpenSchoolAsync(schoolIdentifier); // Search and open the school
-                    await mmPage.HandleMMMaintenancePopupIfPresentAsync();
-                    await mmPage.HandleMMReactivatedPopupIfPresentAsync();
-                    await mmPage.NavigateToFeeManagementAsync(); // Navigate to Fee Management
-                    Console.WriteLine("Landed in Fee Management page");
-                    ledgerPayments = await mmPage.GetChargesPaymentsAsync();// Verify charges, payments posted in last 24 hrs from the ledger
-                    //if (schoolCode != "3932" && schoolCode != "4291")
-                    if (schoolIdentifier != "4291" && schoolIdentifier != "5940" && schoolIdentifier != "8518")
-                    {
-                        dashboardAmount = await mmPage.VerifySchoolMMDashboardAsync(startDate);// Open dashboard, filter current school year, and read data
-                    }
-                    await mmPage.VerifyFeeManagementAsync(); // Open the Fee Management page
-                    objreport = await mmPage.LoopFilterAsync(schoolIdentifier);// Loop through all MM reports and get values
-                    await mmPage.VerifyAccountStatusAsync(objreport);// Track account status
-                    await mmPage.WriteAuditReportInExcel(objreport, ledgerPayments, dashboardAmount, i, startDate, auditTable.Rows.Count);// Write values to Excel
-                }
-                catch (Exception exception)
-                {
-                    var schoolFailure = new InvalidOperationException(
-                        $"Audit failed for school '{schoolIdentifier}' (start date {startDate}).",
-                        exception);
-                    failures.Add(schoolFailure);
-                    Console.Error.WriteLine(schoolFailure);
-
-                    try
-                    {
-                        await mmPage.RecordSchoolAuditFailureAsync(
-                            i,
-                            auditTable.Rows.Count,
-                            schoolIdentifier,
-                            startDate,
-                            exception);
-                    }
-                    catch (Exception recordException)
-                    {
-                        failures.Add(new InvalidOperationException(
-                            $"Could not record the failure for school '{schoolIdentifier}' in the audit outputs.",
-                            recordException));
-                    }
-
-                    try
-                    {
-                        await mmPage.CreateAuditOutputCheckpointAsync();
-                    }
-                    catch (Exception checkpointException)
-                    {
-                        failures.Add(new InvalidOperationException(
-                            $"Could not checkpoint the audit outputs after school '{schoolIdentifier}' failed.",
-                            checkpointException));
-                    }
+                    failedRows.Add(i);
                 }
 
-                if (auditTable.Rows.Count != i + 1)
+                if (total != i + 1 && !await TryBackToAcutisAsync(auditTable.Rows[i]["SchoolCode"], failures))
                 {
-                    try
-                    {
-                        await mmPage.BackToAcutisAsync();
-                    }
-                    catch (Exception recoveryException)
-                    {
-                        string recoveryMessage =
-                            $"Could not return to Acutis after school '{schoolIdentifier}'; remaining schools were not run.";
-                        failures.Add(new InvalidOperationException(recoveryMessage, recoveryException));
-                        Console.Error.WriteLine(recoveryMessage);
+                    aborted = true;
+                    break;
+                }
+            }
 
-                        try
+            // Pass 2: only the schools that failed in pass 1
+            if (failedRows.Count > 0 && !aborted)
+            {
+                await mmPage.LogAuditIssueAsync(
+                    $"RETRY PASS - re-running {failedRows.Count} failed school(s): " +
+                    string.Join(", ", failedRows.Select(r => auditTable.Rows[r]["SchoolCode"])));
+
+                if (await TryBackToAcutisAsync("retry start", failures))
+                {
+                    for (int k = 0; k < failedRows.Count; k++)
+                    {
+                        int i = failedRows[k];
+                        var retryFailures = new List<Exception>();
+                        if (!await AuditSchoolAsync(auditTable, i, total, retryFailures))
                         {
-                            await mmPage.LogAuditIssueAsync($"{recoveryMessage} {recoveryException.Message}");
-                            await mmPage.CreateAuditOutputCheckpointAsync();
+                            failures.AddRange(retryFailures); // still failing after retry
                         }
-                        catch (Exception checkpointException)
+
+                        if (k != failedRows.Count - 1 &&
+                            !await TryBackToAcutisAsync(auditTable.Rows[i]["SchoolCode"], failures))
                         {
-                            failures.Add(new InvalidOperationException(
-                                "Could not log or checkpoint the audit after recovery failed.",
-                                checkpointException));
+                            break;
                         }
-                        break;
                     }
                 }
+            }
+            else if (failedRows.Count > 0)
+            {
+                failures.Add(new InvalidOperationException(
+                    "Retry pass skipped because the browser could not return to Acutis."));
             }
 
             if (failures.Count > 0)
             {
                 throw new AggregateException(
-                    $"The school audit completed with {failures.Count} error(s). Text log: {mmPage.path}",
+                    $"The school audit completed with {failures.Count} error(s) after the retry pass. Text log: {mmPage.path}",
                     failures);
+            }
+        }
+
+        // Audits one school and writes its Excel row / text log. Returns false when it failed.
+        private async Task<bool> AuditSchoolAsync(Table auditTable, int i, int total, List<Exception>? failureSink)
+        {
+            Report objreport = new Report();
+            LedgerPayments ledgerPayments = new LedgerPayments();
+            DashboardAmount dashboardAmount = new DashboardAmount();
+
+            string schoolIdentifier = auditTable.Rows[i]["SchoolCode"];
+            string startDate = auditTable.Rows[i]["StartDate"];
+            try
+            {
+                await mmPage.OpenSchoolAsync(schoolIdentifier); // Search and open the school
+                await mmPage.HandleMMMaintenancePopupIfPresentAsync();
+                await mmPage.HandleMMReactivatedPopupIfPresentAsync();
+                await mmPage.NavigateToFeeManagementAsync(); // Navigate to Fee Management
+                Console.WriteLine("Landed in Fee Management page");
+                ledgerPayments = await mmPage.GetChargesPaymentsAsync();// Verify charges, payments posted in last 24 hrs from the ledger
+                if (schoolIdentifier != "4291" && schoolIdentifier != "5940" && schoolIdentifier != "8518")
+                {
+                    dashboardAmount = await mmPage.VerifySchoolMMDashboardAsync(startDate);// Open dashboard, filter current school year, and read data
+                }
+                await mmPage.VerifyFeeManagementAsync(); // Open the Fee Management page
+                objreport = await mmPage.LoopFilterAsync(schoolIdentifier);// Loop through all MM reports and get values
+                await mmPage.VerifyAccountStatusAsync(objreport);// Track account status
+                await mmPage.WriteAuditReportInExcel(objreport, ledgerPayments, dashboardAmount, i, startDate, total);// Write values to Excel
+                return true;
+            }
+            catch (Exception exception)
+            {
+                var schoolFailure = new InvalidOperationException(
+                    $"Audit failed for school '{schoolIdentifier}' (start date {startDate}).",
+                    exception);
+                Console.Error.WriteLine(schoolFailure);
+                var sink = failureSink ?? new List<Exception>();
+                sink.Add(schoolFailure);
+
+                try
+                {
+                    await mmPage.RecordSchoolAuditFailureAsync(i, total, schoolIdentifier, startDate, exception);
+                }
+                catch (Exception recordException)
+                {
+                    sink.Add(new InvalidOperationException(
+                        $"Could not record the failure for school '{schoolIdentifier}' in the audit outputs.",
+                        recordException));
+                }
+                return false;
+            }
+        }
+
+        private async Task<bool> TryBackToAcutisAsync(string context, List<Exception> failures)
+        {
+            try
+            {
+                await mmPage.BackToAcutisAsync();
+                return true;
+            }
+            catch (Exception recoveryException)
+            {
+                string recoveryMessage = $"Could not return to Acutis after '{context}'; remaining schools were not run.";
+                failures.Add(new InvalidOperationException(recoveryMessage, recoveryException));
+                Console.Error.WriteLine(recoveryMessage);
+                try
+                {
+                    await mmPage.LogAuditIssueAsync($"{recoveryMessage} {recoveryException.Message}");
+                }
+                catch (Exception logException)
+                {
+                    failures.Add(new InvalidOperationException("Could not log the audit issue after recovery failed.", logException));
+                }
+                return false;
             }
         }
     }

@@ -122,50 +122,50 @@ this.ScenarioInitialize(scenarioInfo);
                             "SchoolCode",
                             "StartDate"});
                 table2.AddRow(new string[] {
-                            "5158",
-                            "06/25/2026"});
+                            "7291",
+                            "07/01/2026"});
                 table2.AddRow(new string[] {
-                            "3932",
-                            "07/20/2026"});
+                            "7304",
+                            "07/01/2026"});
                 table2.AddRow(new string[] {
-                            "8400",
-                            "06/10/2026"});
-                table2.AddRow(new string[] {
-                            "7292",
-                            "06/12/2026"});
-                table2.AddRow(new string[] {
-                            "7127",
-                            "07/23/2026"});
-                table2.AddRow(new string[] {
-                            "7303",
-                            "07/06/2026"});
-                table2.AddRow(new string[] {
-                            "6929",
-                            "05/28/2026"});
-                table2.AddRow(new string[] {
-                            "St. Bridget School - River Falls",
+                            "8763",
                             "07/08/2026"});
                 table2.AddRow(new string[] {
-                            "221",
-                            "07/09/2026"});
+                            "8308",
+                            "06/18/2026"});
                 table2.AddRow(new string[] {
-                            "8298",
+                            "142",
+                            "05/22/2026"});
+                table2.AddRow(new string[] {
+                            "7296",
                             "07/20/2026"});
                 table2.AddRow(new string[] {
-                            "8958",
-                            "06/25/2026"});
-                table2.AddRow(new string[] {
-                            "7128",
-                            "06/17/2026"});
-                table2.AddRow(new string[] {
-                            "6142",
-                            "06/25/2026"});
-                table2.AddRow(new string[] {
-                            "8507",
-                            "06/19/2026"});
-                table2.AddRow(new string[] {
-                            "7285",
+                            "8417",
                             "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8369",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8407",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8188",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8232",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8545",
+                            "06/14/2026"});
+                table2.AddRow(new string[] {
+                            "8235",
+                            "06/26/2026"});
+                table2.AddRow(new string[] {
+                            "6904",
+                            "07/20/2026"});
+                table2.AddRow(new string[] {
+                            "8351",
+                            "06/22/2026"});
 #line 11
  testRunner.And("Open all the MM schools and audit the fee details everyday", ((string)(null)), table2, "And ");
 #line hidden
