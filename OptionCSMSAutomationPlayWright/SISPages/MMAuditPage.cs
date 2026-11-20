@@ -68,11 +68,80 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             _page = page;
             this.waitHelper = waitHelper;
             Directory.CreateDirectory(directoryPath);
-            path = Path.Combine(directoryPath, "Audit Summary.txt");
-            auditWorkbookPath = Path.Combine(directoryPath, "AuditSummary.xlsx");
-            // One fixed pair of output files; start each run fresh.
-            if (File.Exists(path)) File.Delete(path);
-            if (File.Exists(auditWorkbookPath)) File.Delete(auditWorkbookPath);
+            // File names are prefixed with today's India date as MMddyyyy, e.g. "11202026- Audit Summary.txt".
+            string datePrefix = GetIndiaToday().ToString("MMddyyyy", CultureInfo.InvariantCulture);
+            path = Path.Combine(directoryPath, $"{datePrefix}- Audit Summary.txt");
+            auditWorkbookPath = Path.Combine(directoryPath, $"{datePrefix}- AuditSummary.xlsx");
+            // Outputs are reset by PrepareAuditOutputs() unless a previous run left failed schools to retry.
+        }
+
+        private static DateTime GetIndiaToday()
+        {
+            DateTime utcNow = DateTime.UtcNow;
+            foreach (string id in new[] { "India Standard Time", "Asia/Kolkata" })
+            {
+                try
+                {
+                    return TimeZoneInfo.ConvertTimeFromUtc(utcNow, TimeZoneInfo.FindSystemTimeZoneById(id)).Date;
+                }
+                catch (TimeZoneNotFoundException) { }
+                catch (InvalidTimeZoneException) { }
+            }
+            return utcNow.AddHours(5).AddMinutes(30).Date; // IST is UTC+05:30
+        }
+
+        /// <summary>
+        /// Looks at the existing output files. If the workbook has FAILED rows, they are kept and the
+        /// zero-based school indexes to retry are returned. Otherwise the files are reset for a fresh run
+        /// and an empty list is returned.
+        /// </summary>
+        public List<int> PrepareAuditOutputs()
+        {
+            // Adopt outputs from the older naming ("Audit Summary.txt", "1 Audit Summary.txt") if today's
+            // dated files don't exist yet, so an in-progress run can be resumed. Originals are left untouched.
+            if (!File.Exists(auditWorkbookPath) && Directory.Exists(directoryPath))
+            {
+                string legacyXlsx = Path.Combine(directoryPath, "AuditSummary.xlsx");
+                if (!File.Exists(legacyXlsx))
+                {
+                    legacyXlsx = Directory.GetFiles(directoryPath, "? AuditSummary.xlsx")
+                        .OrderBy(f => f).LastOrDefault();
+                }
+                if (legacyXlsx != null && File.Exists(legacyXlsx))
+                {
+                    File.Copy(legacyXlsx, auditWorkbookPath, true);
+                    string legacyTxt = legacyXlsx.Replace("AuditSummary.xlsx", "Audit Summary.txt");
+                    if (File.Exists(legacyTxt)) File.Copy(legacyTxt, path, true);
+                }
+            }
+
+            var failed = new List<int>();
+            if (File.Exists(auditWorkbookPath))
+            {
+                using (ExcelPackage package = new ExcelPackage(new FileInfo(auditWorkbookPath)))
+                {
+                    ExcelWorksheet ws = package.Workbook.Worksheets.FirstOrDefault(w => w.Name == "2026-2027");
+                    if (ws?.Dimension != null)
+                    {
+                        for (int row = 2; row <= ws.Dimension.End.Row; row++)
+                        {
+                            string status = ws.Cells[$"U{row}"].Text ?? string.Empty;
+                            if (status.StartsWith("FAILED", StringComparison.OrdinalIgnoreCase)
+                                && int.TryParse(ws.Cells[$"A{row}"].Text, out int serial))
+                            {
+                                failed.Add(serial - 1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (failed.Count == 0)
+            {
+                if (File.Exists(path)) File.Delete(path);
+                if (File.Exists(auditWorkbookPath)) File.Delete(auditWorkbookPath);
+            }
+            return failed;
         }
 
         #region Xpath Elements
@@ -211,7 +280,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 Directory.CreateDirectory(directoryPath);
             }
 
-            using (new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            using (new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
             {
             }
             await TxtAcuUserName.FillAsync(username);
@@ -638,7 +707,30 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             {
                 var (startDate, endDate) = ranges[index];
                 if (index > 0)
-                    await OpenFreshReportPageAsync(911);
+                {
+                    // Stay on the Report 911 page and just change the date range filter.
+                    // Only go back to the report manager if the filters are not available on this page.
+                    var filtersAvailable = false;
+                    try
+                    {
+                        await TransStartDateFilter.WaitForAsync(
+                            new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
+                        await Btn911Filter.WaitForAsync(
+                            new() { State = WaitForSelectorState.Visible, Timeout = 10000 });
+                        filtersAvailable = true;
+                    }
+                    catch (TimeoutException)
+                    {
+                    }
+
+                    if (!filtersAvailable)
+                    {
+                        await auditWriter.WriteLineAsync(
+                            "Report 911 date filters not available on the result page; reopening the report.");
+                        await auditWriter.FlushAsync();
+                        await OpenFreshReportPageAsync(911);
+                    }
+                }
 
                 var rangeResult = await RunReport911RangeAsync(
                     startDate,
@@ -894,11 +986,31 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             // Wait after dismissing optional popups, which can keep the loader active.
             await WaitForLoadingOverlayToDisappearAsync();
-            await AdministrationMenu.First.ClickAsync();
 
-            // Wait for the Fee Management menu to be visible and click it
-            await FeeManagementMenu.WaitForAsync();
-            await FeeManagementMenu.ClickAsync();
+            // The Administration dropdown sometimes does not open (or closes again) on a slow page,
+            // leaving Fee Management in the DOM but hidden. Retry opening it, then fall back to its link.
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                await AdministrationMenu.First.ClickAsync();
+                try
+                {
+                    await FeeManagementMenu.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8000 });
+                    await FeeManagementMenu.ClickAsync(new() { Timeout = 10000 });
+                    return;
+                }
+                catch (TimeoutException)
+                {
+                    Console.WriteLine($"Fee Management menu not clickable (attempt {attempt}); retrying.");
+                    await WaitForLoadingOverlayToDisappearAsync();
+                }
+            }
+
+            string href = await FeeManagementMenu.GetAttributeAsync("href");
+            if (string.IsNullOrWhiteSpace(href))
+            {
+                throw new InvalidOperationException("Fee Management menu link could not be opened.");
+            }
+            await _page.GotoAsync(new Uri(new Uri(_page.Url), href).ToString());
         }
 
         public async Task VerifyFeeManagementAsync()
@@ -2219,18 +2331,60 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         private async Task SelectLedgerScopeAsync(ILocator dropdown, ILocator allOption, string expectedSelection)
         {
-            await dropdown.WaitForAsync(
-                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
-            await dropdown.ClickAsync();
-            await allOption.WaitForAsync(
-                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
-            await allOption.ClickAsync();
-            await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
-
             var selectedScope = _page.Locator(
                 $"//span[contains(@id, 'Users') and contains(normalize-space(.), '{expectedSelection}')]");
-            await selectedScope.WaitForAsync(
-                new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+
+            // The select2 selection occasionally does not stick (or the page resets it); retry the selection.
+            Exception lastError = null;
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    // Wait for the page/dropdown to finish loading BEFORE selecting.
+                    await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+                    await dropdown.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+                    try { await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 10000 }); } catch (TimeoutException) { }
+                    await dropdown.ClickAsync();
+
+                    // Wait until the select2 list is populated (not "Searching..."/"Loading...") before choosing.
+                    var options = _page.Locator(".select2-results__option");
+                    await options.First.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+                    await _page.WaitForFunctionAsync(
+                        "() => { const o = document.querySelectorAll('.select2-results__option'); " +
+                        "return o.length > 0 && ![...o].some(x => /searching|loading/i.test(x.textContent)); }",
+                        null,
+                        new() { Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+                    await allOption.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+                    await allOption.ClickAsync();
+
+                    // Wait for the page to finish reloading data AFTER selecting.
+                    await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+                    try { await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 10000 }); } catch (TimeoutException) { }
+
+                    // Check the dropdown itself as well as the generic span.
+                    await selectedScope.First.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = 15000 });
+                    return;
+                }
+                catch (Exception ex) when (ex is TimeoutException || ex is PlaywrightException)
+                {
+                    lastError = ex;
+                    string current = string.Empty;
+                    try { current = (await dropdown.InnerTextAsync(new() { Timeout = 3000 })).Trim(); } catch { }
+                    if (current.Contains(expectedSelection, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return; // selection is actually applied; the generic span just wasn't matched
+                    }
+                    Console.WriteLine($"Ledger scope '{expectedSelection}' not applied (attempt {attempt}, shows '{current}'); retrying.");
+                    try { await _page.Keyboard.PressAsync("Escape"); } catch { }
+                    await WaitForLoadingOverlayToDisappearAsync(timeout: MaximumUiWaitTimeoutMs);
+                }
+            }
+            throw new InvalidOperationException(
+                $"Could not select ledger scope '{expectedSelection}' after 3 attempts.", lastError);
         }
         #endregion
       

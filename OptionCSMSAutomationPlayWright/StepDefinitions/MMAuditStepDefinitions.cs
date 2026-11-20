@@ -40,8 +40,17 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
             var failedRows = new List<int>();
             bool aborted = false;
 
+            // If a previous run left FAILED rows in the existing output files, resume by retrying only those.
+            var resumeRows = mmPage.PrepareAuditOutputs().Where(r => r >= 0 && r < total).ToList();
+            bool resuming = resumeRows.Count > 0;
+            if (resuming)
+            {
+                failedRows.AddRange(resumeRows);
+                await mmPage.LogAuditIssueAsync($"RESUME - existing outputs found with {resumeRows.Count} failed school(s); pass 1 skipped.");
+            }
+
             // Pass 1: every school
-            for (int i = 0; i < total; i++)
+            for (int i = 0; i < total && !resuming; i++)
             {
                 if (!await AuditSchoolAsync(auditTable, i, total, null))
                 {
