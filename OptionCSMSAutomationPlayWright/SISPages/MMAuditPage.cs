@@ -2079,7 +2079,14 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // Assigning values
                 workSheet.Cells[$"A{lastRow}"].Value = lastRow - 1;
                 workSheet.Cells[$"V{lastRow}"].Value = schoolCode;
-                workSheet.Cells[$"B{lastRow}"].Value = getSchoolName;
+                // Show the school code with the name, e.g. "Holy Trinity School - Kewaskum (7127)".
+                string codeSuffix = $"({schoolCode})";
+                workSheet.Cells[$"B{lastRow}"].Value =
+                    string.IsNullOrWhiteSpace(schoolCode)
+                    || getSchoolName.EndsWith(codeSuffix, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(getSchoolName, schoolCode, StringComparison.OrdinalIgnoreCase)
+                        ? getSchoolName
+                        : $"{getSchoolName} {codeSuffix}";
                 workSheet.Cells[$"C{lastRow}"].Value = startDate;
                 workSheet.Cells[$"D{lastRow}"].Value = dashboardAmount?.CCTotalAmount;
                 workSheet.Cells[$"E{lastRow}"].Value = dashboardAmount?.eCheckTotalAmount;
@@ -2119,9 +2126,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                         cell.Style.Numberformat.Format = "$#,##0.00";
                     }
                 }
-                // Conditional Formatting for Comparison Results
-                workSheet.Cells[$"T{lastRow}"].Style.Font.Color.SetColor(
-                    objReport?.CompareResults?.Contains("are not equal") == true ? Color.Red : Color.Green);
+                // Funding Amount vs Transaction Amount (902 & 905): red font for any "NOT equal" line.
+                ApplyCompareResultColors(workSheet.Cells[$"U{lastRow}"]);
                 // Summary Rows (placed right after the last school row)
                 int finalRow = WriteAuditTotals(workSheet);
                 // Formatting
@@ -2181,6 +2187,29 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         }
 
         // Trims each line, drops blank lines and joins with a single line break (no trailing blank line).
+        // Lines containing "NOT equal" are shown in red; "are equal" lines stay black.
+        private static void ApplyCompareResultColors(ExcelRange cell)
+        {
+            string text = cell.Text ?? cell.Value?.ToString() ?? string.Empty;
+            text = cell.Value?.ToString() ?? text;
+            if (text.IndexOf("not equal", StringComparison.OrdinalIgnoreCase) < 0)
+                return;
+
+            var lines = text.Split('\n');
+            cell.RichText.Clear();
+            cell.IsRichText = true;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i].TrimEnd('\r');
+                var part = cell.RichText.Add(i < lines.Length - 1 ? line + "\n" : line);
+                part.Size = 11;
+                part.Bold = false;
+                part.Color = line.IndexOf("not equal", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? Color.Red
+                    : Color.Black;
+            }
+        }
+
         private static string NormalizeMultilineCell(string? text)
         {
             if (string.IsNullOrWhiteSpace(text)) return string.Empty;
