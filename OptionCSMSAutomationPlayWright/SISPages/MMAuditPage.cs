@@ -289,7 +289,39 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         public async Task OpenSchoolAsync(string searchSchool)
         {
-            await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name    
+            // The Acutis school list can load slowly or not at all (search box missing, or no result row after
+            // searching). Retry: reload the school list and search again, up to 3 times.
+            const int searchAttempts = 3;
+            for (int attempt = 1; attempt <= searchAttempts; attempt++)
+            {
+                try
+                {
+                    if (attempt > 1)
+                    {
+                        Console.WriteLine($"Acutis school search for '{searchSchool}' not ready (attempt {attempt - 1}); reloading the school list.");
+                        await _page.GotoAsync(
+                            "https://acutis.optionc.com/school-details",
+                            new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
+                    }
+
+                    await TxtAcuSchoolSearch.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = 60000 });
+                    try { await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15000 }); }
+                    catch (TimeoutException) { }
+
+                    await TxtAcuSchoolSearch.FillAsync(searchSchool); // Enter the school name
+                    try { await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 10000 }); }
+                    catch (TimeoutException) { }
+
+                    await IconNextGen.First.WaitForAsync(
+                        new() { State = WaitForSelectorState.Visible, Timeout = 30000 });
+                    break;
+                }
+                catch (Exception ex) when (attempt < searchAttempts && (ex is TimeoutException || ex is PlaywrightException))
+                {
+                    Console.WriteLine($"Acutis school search attempt {attempt} failed: {ex.Message.Split('\n')[0]}");
+                }
+            }
 
             var waitForNewPage = _page.Context.WaitForPageAsync(); // Prepare to wait for the new page before clicking
 
