@@ -78,7 +78,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
             // Outputs are reset by PrepareAuditOutputs() unless a previous run left failed schools to retry.
         }
 
-        private static DateTime GetIndiaToday()
+        internal static DateTime GetIndiaToday()
         {
             DateTime utcNow = DateTime.UtcNow;
             foreach (string id in new[] { "India Standard Time", "Asia/Kolkata" })

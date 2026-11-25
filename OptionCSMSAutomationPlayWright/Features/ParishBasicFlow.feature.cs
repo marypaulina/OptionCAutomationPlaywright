@@ -106,16 +106,16 @@ this.ScenarioInitialize(scenarioInfo);
             else
             {
                 this.ScenarioStart();
-                TechTalk.SpecFlow.Table table3 = new TechTalk.SpecFlow.Table(new string[] {
+                TechTalk.SpecFlow.Table table4 = new TechTalk.SpecFlow.Table(new string[] {
                             "URL",
                             "Username",
                             "Password"});
-                table3.AddRow(new string[] {
+                table4.AddRow(new string[] {
                             "https://parish-acutis.optionc.com/",
                             "jclement@optionc.com",
                             "password"});
 #line 6
- testRunner.Given("I sign in using Parish Acutis user credentials", ((string)(null)), table3, "Given ");
+ testRunner.Given("I sign in using Parish Acutis user credentials", ((string)(null)), table4, "Given ");
 #line hidden
 #line 9
  testRunner.And("I Verify whether all the parish dasboard elements are displayed for the parish ad" +
@@ -156,16 +156,16 @@ this.ScenarioInitialize(scenarioInfo);
             else
             {
                 this.ScenarioStart();
-                TechTalk.SpecFlow.Table table4 = new TechTalk.SpecFlow.Table(new string[] {
+                TechTalk.SpecFlow.Table table5 = new TechTalk.SpecFlow.Table(new string[] {
                             "URL",
                             "Username",
                             "Password"});
-                table4.AddRow(new string[] {
+                table5.AddRow(new string[] {
                             "https://parish-acutis.optionc.com/",
                             "jclement@optionc.com",
                             "password"});
 #line 13
- testRunner.Given("I sign in using Parish Acutis user credentials", ((string)(null)), table4, "Given ");
+ testRunner.Given("I sign in using Parish Acutis user credentials", ((string)(null)), table5, "Given ");
 #line hidden
 #line 16
  testRunner.When("I navigate to the Recent Tickets page", ((string)(null)), ((TechTalk.SpecFlow.Table)(null)), "When ");
