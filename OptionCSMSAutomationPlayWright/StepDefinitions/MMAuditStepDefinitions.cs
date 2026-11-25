@@ -108,6 +108,47 @@ namespace OptionCSMSAutomationPlayWright.StepDefinitions
             }
         }
 
+        // TEMPORARY: re-count only "Acts Activated (Last 24 hrs)" for each listed school and update just that column.
+        /* Temporary logic - commented out; uncomment to re-run.
+        [Given(@"Refresh only the Acts Activated count for the listed schools")]
+        public async Task GivenRefreshOnlyTheActsActivatedCountForTheListedSchools(Table auditTable)
+        {
+            var failed = new List<string>();
+            for (int i = 0; i < auditTable.Rows.Count; i++)
+            {
+                string code = auditTable.Rows[i]["SchoolCode"];
+                try
+                {
+                    await mmPage.OpenSchoolAsync(code);
+                    await mmPage.HandleMMMaintenancePopupIfPresentAsync();
+                    await mmPage.HandleMMReactivatedPopupIfPresentAsync();
+                    await mmPage.NavigateToFeeManagementAsync();
+                    await mmPage.RefreshActivatedLast24HoursAsync(code);
+                }
+                catch (Exception ex)
+                {
+                    failed.Add(code);
+                    Console.Error.WriteLine($"Acts Activated refresh failed for {code}: {ex.Message}");
+                }
+
+                if (i != auditTable.Rows.Count - 1)
+                {
+                    try { await mmPage.BackToAcutisAsync(); }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Could not return to Acutis after {code}: {ex.Message}");
+                        failed.AddRange(Enumerable.Range(i + 1, auditTable.Rows.Count - i - 1)
+                            .Select(k => auditTable.Rows[k]["SchoolCode"]));
+                        break;
+                    }
+                }
+            }
+
+            if (failed.Count > 0)
+                throw new InvalidOperationException("Acts Activated refresh failed for: " + string.Join(", ", failed));
+        }
+        */
+
         // Audits one school and writes its Excel row / text log. Returns false when it failed.
         private async Task<bool> AuditSchoolAsync(Table auditTable, int i, int total, List<Exception>? failureSink)
         {

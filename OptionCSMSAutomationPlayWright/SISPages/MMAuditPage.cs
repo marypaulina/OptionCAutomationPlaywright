@@ -284,7 +284,26 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         {
             // **Ensure the new page is maximized**
             await _page.SetViewportSizeAsync(1500, 1080); // Resize the viewport
-            await _page.EvaluateAsync("window.moveTo(0, 0); window.resizeTo(screen.width, screen.height);"); // Maximize using JavaScript
+            // The page may still be navigating ("Execution context was destroyed"); wait and retry.
+            for (int attempt = 1; attempt <= 4; attempt++)
+            {
+                try
+                {
+                    await _page.EvaluateAsync("window.moveTo(0, 0); window.resizeTo(screen.width, screen.height);"); // Maximize using JavaScript
+                    return;
+                }
+                catch (PlaywrightException) when (attempt < 4)
+                {
+                    try { await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded, new() { Timeout = 15000 }); }
+                    catch (Exception) { }
+                    await Task.Delay(1500);
+                }
+                catch (PlaywrightException)
+                {
+                    // Resizing the window is cosmetic; never fail the audit because of it.
+                    Console.WriteLine("Could not resize the window (page kept navigating); continuing.");
+                }
+            }
         }
 
         public async Task OpenSchoolAsync(string searchSchool)
@@ -356,11 +375,24 @@ namespace OptionCSMSAutomationPlayWright.SISPages
         // To navigate back to the Acutis domain
         public async Task BackToAcutisAsync()
         {
-            await MaxWindow();
-            await _page.GotoAsync(
-                "https://acutis.optionc.com/school-details",
-                new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
-            // Navigate to the Acutis school details page
+            // Navigate to the Acutis school details page; retry because the previous school's page may still be
+            // navigating or the navigation may be aborted.
+            for (int attempt = 1; attempt <= 3; attempt++)
+            {
+                try
+                {
+                    await MaxWindow();
+                    await _page.GotoAsync(
+                        "https://acutis.optionc.com/school-details",
+                        new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
+                    return;
+                }
+                catch (Exception ex) when (attempt < 3 && (ex is PlaywrightException || ex is TimeoutException))
+                {
+                    Console.WriteLine($"Back to Acutis attempt {attempt} failed: {ex.Message.Split('\n')[0]}; retrying.");
+                    await Task.Delay(3000);
+                }
+            }
         }
 
         public async Task HandleMMMaintenancePopupIfPresentAsync()
@@ -1378,6 +1410,139 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         #region Account Activated On , Verify Account Status Report data #907
 
+        // Opens Account History in Report 0907 and counts accounts activated in the last 24 hours (school time).
+        // Expects the Report 0907 page to be the current page, already run once with the Show boxes ticked.
+        private async Task<int> CountActivatedLast24HoursAsync()
+        {
+                LogToFile("Checking Account History - Accounts Activated in Last 24 Hours", true);
+
+                // Select Account History radio button
+                await RbAccountHistory.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible });
+                await RbAccountHistory.ClickAsync();
+                LogToFile("Account History radio button selected.");
+
+                // Run Account History report
+                await EnsureShowStaffCheckedAsync();
+                if (await BtnRunReport.IsEnabledAsync())
+                {
+                    await BtnRunReport.ClickAsync(new()
+                    {
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                    });
+
+                    LogToFile("Run Report clicked for Account History.");
+                    await WaitForLoadingOverlayToDisappearAsync();
+                }
+                else
+                {
+                    throw new Exception("Run Report button is disabled for Account History.");
+                }
+
+                // Wait for Account History grid
+                await ThActivatedOn.WaitForAsync(
+                    new()
+                    {
+                        State = WaitForSelectorState.Visible,
+                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
+                    });
+
+                // Display all Account History records
+                if (await RecordLength.IsVisibleAsync())
+                {
+                    await RecordLength.SelectOptionAsync("-1");
+
+                    LogToFile("Account History Record Length set to All.");
+                }
+                await WaitForLoadingOverlayToDisappearAsync();
+
+                // Sort Activated On column in descending order
+                var sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
+
+                if (sortOrder != "descending")
+                {
+                    await ThActivatedOn.ClickAsync();
+
+                    sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
+
+                    // If first click sorts ascending, click again for descending
+                    if (sortOrder != "descending")
+                    {
+                        await ThActivatedOn.ClickAsync();
+                    }
+                }
+
+                LogToFile("Activated On column sorted in descending order.");
+
+                // Calculate the previous 24 hours
+                // The "Activated On" times are US (school) times, while this machine runs on India time.
+                // Compare them against the current time in the US zone, not the machine's local time.
+                DateTime currentTime = GetSchoolLocalNow();
+
+                DateTime last24Hours = currentTime.AddHours(-24);
+                LogToFile($"Counting activations between {last24Hours:MM/dd/yyyy hh:mm:ss tt} and {currentTime:MM/dd/yyyy hh:mm:ss tt} (school time).");
+
+                int activatedCount = 0;
+
+                // Get all Account History rows
+                var accountHistoryRows = _page.Locator(
+                    "//table[@id='tblParentAccountSetup']/tbody/tr");
+
+                int historyRowCount = await accountHistoryRows.CountAsync();
+
+                LogToFile($"Total Account History records: {historyRowCount}");
+
+                // Read Activated On date from the 9th column
+                for (int i = 0; i < historyRowCount; i++)
+                {
+                    var row = accountHistoryRows.Nth(i);
+
+                    // Skip empty table message
+                    if (await row.Locator("td.dataTables_empty").CountAsync() > 0)
+                    {
+                        continue;
+                    }
+
+                    var activatedCell = row.Locator("td").Nth(8);
+
+                    // Read data-sort attribute
+                    string activatedDateText =
+                        await activatedCell.GetAttributeAsync("data-sort") ?? string.Empty;
+
+                    if (string.IsNullOrWhiteSpace(activatedDateText))
+                    {
+                        continue;
+                    }
+
+                    // Parse date format: 20260817 05:00:00 AM
+                    if (DateTime.TryParseExact(
+                        activatedDateText.Trim(),
+                        "yyyyMMdd hh:mm:ss tt",
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out DateTime activatedDate))
+                    {
+                        // Check whether activation happened within the last 24 hours
+                        if (activatedDate >= last24Hours &&
+                            activatedDate <= currentTime)
+                        {
+                            activatedCount++;
+
+                            LogToFile(
+                                $"Activated Account: {activatedDate:MM/dd/yyyy hh:mm:ss tt}");
+                        }
+                    }
+                    else
+                    {
+                        LogToFile(
+                            $"Unable to parse Activated On date: {activatedDateText}");
+                    }
+                }
+                LogToFile(
+                    $"Total Accounts Activated in the Last 24 Hours: {activatedCount}");
+                return activatedCount;
+        }
+
         public async Task<Report> VerifyAccountStatusAsync(Report objreport)
         {
             try
@@ -1520,133 +1685,8 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 // 4. ACCOUNT HISTORY - ACTIVATED IN LAST 24 HOURS
                 // --------------------------------------------------
 
-                LogToFile("Checking Account History - Accounts Activated in Last 24 Hours", true);
-
-                // Select Account History radio button
-                await RbAccountHistory.WaitForAsync(
-                    new() { State = WaitForSelectorState.Visible });
-                await RbAccountHistory.ClickAsync();
-                LogToFile("Account History radio button selected.");
-
-                // Run Account History report
-                await EnsureShowStaffCheckedAsync();
-                if (await BtnRunReport.IsEnabledAsync())
-                {
-                    await BtnRunReport.ClickAsync(new()
-                    {
-                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
-                    });
-
-                    LogToFile("Run Report clicked for Account History.");
-                    await WaitForLoadingOverlayToDisappearAsync();
-                }
-                else
-                {
-                    throw new Exception("Run Report button is disabled for Account History.");
-                }
-
-                // Wait for Account History grid
-                await ThActivatedOn.WaitForAsync(
-                    new()
-                    {
-                        State = WaitForSelectorState.Visible,
-                        Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs
-                    });
-
-                // Display all Account History records
-                if (await RecordLength.IsVisibleAsync())
-                {
-                    await RecordLength.SelectOptionAsync("-1");
-
-                    LogToFile("Account History Record Length set to All.");
-                }
-                await WaitForLoadingOverlayToDisappearAsync();
-
-                // Sort Activated On column in descending order
-                var sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
-
-                if (sortOrder != "descending")
-                {
-                    await ThActivatedOn.ClickAsync();
-
-                    sortOrder = await ThActivatedOn.GetAttributeAsync("aria-sort");
-
-                    // If first click sorts ascending, click again for descending
-                    if (sortOrder != "descending")
-                    {
-                        await ThActivatedOn.ClickAsync();
-                    }
-                }
-
-                LogToFile("Activated On column sorted in descending order.");
-
-                // Calculate the previous 24 hours
-                DateTime currentTime = DateTime.Now;
-
-                DateTime last24Hours = currentTime.AddHours(-24);
-
-                int activatedCount = 0;
-
-                // Get all Account History rows
-                var accountHistoryRows = _page.Locator(
-                    "//table[@id='tblParentAccountSetup']/tbody/tr");
-
-                int historyRowCount = await accountHistoryRows.CountAsync();
-
-                LogToFile($"Total Account History records: {historyRowCount}");
-
-                // Read Activated On date from the 9th column
-                for (int i = 0; i < historyRowCount; i++)
-                {
-                    var row = accountHistoryRows.Nth(i);
-
-                    // Skip empty table message
-                    if (await row.Locator("td.dataTables_empty").CountAsync() > 0)
-                    {
-                        continue;
-                    }
-
-                    var activatedCell = row.Locator("td").Nth(8);
-
-                    // Read data-sort attribute
-                    string activatedDateText =
-                        await activatedCell.GetAttributeAsync("data-sort") ?? string.Empty;
-
-                    if (string.IsNullOrWhiteSpace(activatedDateText))
-                    {
-                        continue;
-                    }
-
-                    // Parse date format: 20260817 05:00:00 AM
-                    if (DateTime.TryParseExact(
-                        activatedDateText.Trim(),
-                        "yyyyMMdd hh:mm:ss tt",
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.None,
-                        out DateTime activatedDate))
-                    {
-                        // Check whether activation happened within the last 24 hours
-                        if (activatedDate >= last24Hours &&
-                            activatedDate <= currentTime)
-                        {
-                            activatedCount++;
-
-                            LogToFile(
-                                $"Activated Account: {activatedDate:MM/dd/yyyy hh:mm:ss tt}");
-                        }
-                    }
-                    else
-                    {
-                        LogToFile(
-                            $"Unable to parse Activated On date: {activatedDateText}");
-                    }
-                }
-
-                // Store result in Report object
+                int activatedCount = await CountActivatedLast24HoursAsync();
                 objreport.AcctsActivatedLast24Hours = activatedCount.ToString();
-
-                LogToFile(
-                    $"Total Accounts Activated in the Last 24 Hours: {activatedCount}");
 
                 // Write result to log file
                 await using (StreamWriter writer = new StreamWriter(path, true))
@@ -1832,8 +1872,99 @@ namespace OptionCSMSAutomationPlayWright.SISPages
                 }");
         }
 
+        // ---------------- TEMPORARY: refresh only "Acts Activated (Last 24 hrs)" ----------------
+        private bool _suppressTextLog;
+
+        /* Temporary logic - commented out; uncomment (and the step in MMAuditStepDefinitions) to re-run it.
+        // Opens Report 0907 for the current school, counts activations (corrected logic) and writes ONLY
+        // column S of that school's existing row. Nothing else in the workbook or the text log is touched.
+        public async Task RefreshActivatedLast24HoursAsync(string schoolCode)
+        {
+            _suppressTextLog = true;
+            try
+            {
+                await MaxWindow();
+                await _page.GotoAsync(
+                    "https://feemanagement.optionc.com/report-list",
+                    new() { Timeout = PlaywrightTimeoutPolicy.NavigationTimeoutMs });
+                await SearchFeeReportAsync(907, _page);
+                await MaxWindow();
+
+                if (_page.Context.Pages.Count > 1)
+                {
+                    var firstPage = _page.Context.Pages.FirstOrDefault();
+                    if (firstPage != null && !firstPage.IsClosed)
+                        await firstPage.CloseAsync();
+                    _page = _page.Context.Pages.LastOrDefault()
+                        ?? throw new Exception("Failed to switch to the last opened page.");
+                    PlaywrightTimeoutPolicy.Configure(_page.Context);
+                    await _page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+                }
+
+                var runReport = _page.Locator(
+                    "//input[@type='button' and @value='Run Report' and contains(@class,'btn-info')]");
+                await runReport.WaitForAsync(
+                    new() { State = WaitForSelectorState.Visible, Timeout = PlaywrightTimeoutPolicy.ActionTimeoutMs });
+                await EnsureShowStaffCheckedAsync();
+                await BtnRunReport.ClickAsync();
+                await WaitForLoadingOverlayToDisappearAsync();
+
+                int count = await CountActivatedLast24HoursAsync();
+                UpdateActivatedColumnInExcel(schoolCode, count);
+                Console.WriteLine($"Acts Activated refreshed for {schoolCode}: {count}");
+            }
+            finally
+            {
+                _suppressTextLog = false;
+            }
+        }
+
+        private void UpdateActivatedColumnInExcel(string schoolCode, int count)
+        {
+            using (ExcelPackage package = new ExcelPackage(new FileInfo(auditWorkbookPath)))
+            {
+                ExcelWorksheet ws = package.Workbook.Worksheets.FirstOrDefault(w => w.Name == "2026-2027")
+                    ?? throw new InvalidOperationException("The audit workbook has no '2026-2027' sheet.");
+                int end = ws.Dimension?.End.Row ?? 1;
+                int row = -1;
+                for (int r = 2; r <= end; r++)
+                {
+                    if (string.Equals(AuditCodeAt(ws, r), schoolCode.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        row = r;
+                        break;
+                    }
+                }
+                if (row < 0)
+                    throw new InvalidOperationException($"School {schoolCode} has no row in the audit workbook.");
+
+                ws.Cells[row, 19].Value = count;
+                ws.Cells[row, 19].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                ws.Cells[row, 19].Style.Fill.BackgroundColor.SetColor(count >= 1 ? Color.Yellow : Color.MintCream);
+                package.Save();
+            }
+        }
+        */
+
+        // Current time in the US zone the school reports use (Central Time).
+        private static DateTime GetSchoolLocalNow()
+        {
+            foreach (var id in new[] { "Central Standard Time", "America/Chicago" })
+            {
+                try
+                {
+                    return TimeZoneInfo.ConvertTime(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(id));
+                }
+                catch (TimeZoneNotFoundException) { }
+                catch (InvalidTimeZoneException) { }
+            }
+            // Fallback: Central Standard Time (UTC-6), ignoring daylight saving.
+            return DateTime.UtcNow.AddHours(-6);
+        }
+
         private void LogToFile(string message)
         {
+            if (_suppressTextLog) { Console.WriteLine(message); return; }
             try
             {
                 using (StreamWriter writer = new StreamWriter(path, true))
@@ -1849,6 +1980,7 @@ namespace OptionCSMSAutomationPlayWright.SISPages
 
         private void LogToFile(string message, bool addHeader)
         {
+            if (_suppressTextLog) { Console.WriteLine(message); return; }
             try
             {
                 using (StreamWriter writer = new StreamWriter(path, true))
